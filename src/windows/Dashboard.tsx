@@ -1,6 +1,7 @@
 /**
- * The main window: first-run setup wizard until a data folder is chosen,
- * then the dashboard shell — Insights, Applications, and Settings.
+ * The main window shell based on stitch_job_application_tracker_dashboard
+ * and stitch_applicant_tracking_kanban_dashboard reference designs.
+ * Preserves all views, setup flow, data, and routes.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -33,44 +34,71 @@ export default function Dashboard() {
   if (!ready) return <SetupWizard onComplete={refresh} />;
 
   return (
-    <div className="dashboard">
-      <nav className="dashboard-nav">
-        <div className="dashboard-brand">
-          <span className="dashboard-logo">JT</span>
-          <span className="dashboard-name">Job Tracker</span>
-        </div>
-        <div className="dashboard-tabs">
-          {(
-            [
-              ["insights", "Insights"],
-              ["applications", "Applications"],
-              ["assistant", "Assistant"],
-              ["help", "Help"],
-              ["settings", "Settings"],
-            ] as [Tab, string][]
-          ).map(([key, label]) => (
+    <div className="dashboard-shell">
+      <header className="dashboard-top-nav" data-tauri-drag-region>
+        <div className="nav-inner" data-tauri-drag-region>
+          {/* Brand & Tabs */}
+          <div className="nav-left">
+            <div className="brand-group" onClick={() => setTab("insights")}>
+              <div className="brand-badge">
+                <span>JT</span>
+              </div>
+              <div className="brand-text">
+                <span className="brand-name">Job Tracker</span>
+                <span className="brand-sub">Analytics Pro</span>
+              </div>
+            </div>
+
+            {/* Navigation Pills */}
+            <nav className="nav-pills-container">
+              {(
+                [
+                  ["insights", "Insights", "insights"],
+                  ["applications", "Applications", "view_kanban"],
+                  ["assistant", "Assistant", "smart_toy"],
+                  ["help", "Help", "help_outline"],
+                  ["settings", "Settings", "settings"],
+                ] as [Tab, string, string][]
+              ).map(([key, label, icon]) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`nav-pill-btn ${tab === key ? "active" : ""}`}
+                  onClick={() => setTab(key)}
+                >
+                  <span className="material-symbols-outlined nav-pill-icon">
+                    {icon}
+                  </span>
+                  <span>{label}</span>
+                </button>
+              ))}
+            </nav>
+          </div>
+
+          {/* Right Header Actions */}
+          <div className="nav-right">
             <button
-              key={key}
-              className={`dashboard-tab ${tab === key ? "active" : ""}`}
-              onClick={() => setTab(key)}
+              type="button"
+              className="btn-new-application"
+              onClick={() => api.openPopup()}
+              title="Add a new application (Shortcut: Cmd/Ctrl+Shift+J)"
             >
-              {label}
+              <span className="material-symbols-outlined">add</span>
+              <span>New Application</span>
             </button>
-          ))}
+
+            <div className="version-pill">
+              <span>BY MJKR</span>
+            </div>
+
+            <ThemeToggle />
+          </div>
         </div>
-        <button
-          className="primary dashboard-add"
-          onClick={() => api.openPopup()}
-          title="Log a new application (same as the global hotkey)"
-        >
-          + New Application
-        </button>
-        <span className="dashboard-credit">by MJKR</span>
-        <ThemeToggle />
-      </nav>
-      <main className="dashboard-main">
+      </header>
+
+      <main className="dashboard-viewport">
         {tab === "insights" && <Insights />}
-        {tab === "applications" && <Applications />}
+        {tab === "applications" && <Applications onNewApplication={() => api.openPopup()} />}
         {tab === "assistant" && <Assistant />}
         {tab === "help" && <Help />}
         {tab === "settings" && <Settings />}

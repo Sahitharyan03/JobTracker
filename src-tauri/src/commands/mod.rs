@@ -1,10 +1,12 @@
 pub mod anomalies;
 pub mod applications;
 pub mod assistant;
+pub mod capture;
 pub mod compile;
 pub mod documents;
 pub mod export;
 pub mod fields;
 pub mod import;
+pub mod reusable_values;
 pub mod settings;
 pub mod setup;

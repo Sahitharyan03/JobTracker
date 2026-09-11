@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "node scripts/build-extension.mjs && tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "build:extension": "node scripts/build-extension.mjs",
     "lint": "eslint src && tsc --noEmit"
   },
   "dependencies": {

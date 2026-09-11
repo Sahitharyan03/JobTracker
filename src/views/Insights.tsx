@@ -79,6 +79,18 @@ export default function Insights() {
   const series = useMemo(() => dailySeries(apps), [apps]);
   const today = counts.get(dayKey(new Date())) ?? 0;
   const streak = useMemo(() => currentStreak(series), [series]);
+  const interviewCount = useMemo(
+    () => apps.filter((a) => a.status === "interview" || a.status === "screening").length,
+    [apps],
+  );
+  const offerCount = useMemo(
+    () => apps.filter((a) => a.status === "offer").length,
+    [apps],
+  );
+  const conversionRate = useMemo(() => {
+    if (apps.length === 0) return "0%";
+    return `${Math.round((interviewCount / apps.length) * 100)}%`;
+  }, [apps.length, interviewCount]);
 
   const saveGoal = async (count: number, deadline: string | null) => {
     await api.setSetting("goal_count", String(count));
@@ -229,19 +241,65 @@ export default function Insights() {
   };
 
   return (
-    <div className="insights">
-      <div className="insights-headline">
-        <div className="headline-stat">
-          <span className="headline-number">{today}</span>
-          <span className="headline-caption">today</span>
+    <div className="insights-bento-view">
+      {/* 4 BENTO STAT METRICS */}
+      <div className="insights-stats-bento">
+        {/* Total Applications */}
+        <div className="bento-stat-card">
+          <div className="stat-card-header">
+            <span className="stat-card-label">Total Applications</span>
+            <span className="stat-icon-wrapper icon-indigo">
+              <span className="material-symbols-outlined">send</span>
+            </span>
+          </div>
+          <div className="stat-card-body">
+            <span className="stat-card-val">{apps.length}</span>
+            <span className="stat-card-pill pill-indigo">Active pipeline</span>
+          </div>
         </div>
-        <div className="headline-stat">
-          <span className="headline-number">{apps.length}</span>
-          <span className="headline-caption">total</span>
+
+        {/* Interviews & Screening */}
+        <div className="bento-stat-card">
+          <div className="stat-card-header">
+            <span className="stat-card-label">Interviews &amp; Screenings</span>
+            <span className="stat-icon-wrapper icon-amber">
+              <span className="material-symbols-outlined">forum</span>
+            </span>
+          </div>
+          <div className="stat-card-body">
+            <span className="stat-card-val">{interviewCount}</span>
+            <span className="stat-card-pill pill-amber">{conversionRate} response rate</span>
+          </div>
         </div>
-        <div className="headline-stat">
-          <span className="headline-number">{streak}</span>
-          <span className="headline-caption">day streak</span>
+
+        {/* Offers */}
+        <div className="bento-stat-card">
+          <div className="stat-card-header">
+            <span className="stat-card-label">Offers Received</span>
+            <span className="stat-icon-wrapper icon-emerald">
+              <span className="material-symbols-outlined">verified</span>
+            </span>
+          </div>
+          <div className="stat-card-body">
+            <span className="stat-card-val">{offerCount}</span>
+            <span className="stat-card-pill pill-emerald">
+              {offerCount > 0 ? "🎉 Congratulations!" : "Targeting offers"}
+            </span>
+          </div>
+        </div>
+
+        {/* Activity & Streak */}
+        <div className="bento-stat-card">
+          <div className="stat-card-header">
+            <span className="stat-card-label">Activity Streak</span>
+            <span className="stat-icon-wrapper icon-purple">
+              <span className="material-symbols-outlined">local_fire_department</span>
+            </span>
+          </div>
+          <div className="stat-card-body">
+            <span className="stat-card-val">{streak} <span className="stat-val-unit">days</span></span>
+            <span className="stat-card-pill pill-purple">{today} applied today</span>
+          </div>
         </div>
       </div>
 
@@ -249,17 +307,30 @@ export default function Insights() {
         <span className="insights-toolbar-hint">
           {editMode
             ? "Drag cards to reorder · × to remove · changes save automatically"
-            : ""}
+            : "Customizable Analytics Grid"}
         </span>
-        {editMode && (
-          <button onClick={() => setShowBuilder(true)}>+ Add chart</button>
-        )}
-        <button
-          className={editMode ? "primary" : ""}
-          onClick={() => setEditMode(!editMode)}
-        >
-          {editMode ? "Done" : "Customize"}
-        </button>
+        <div className="insights-toolbar-actions">
+          {editMode && (
+            <button
+              type="button"
+              className="btn-add-chart"
+              onClick={() => setShowBuilder(true)}
+            >
+              <span className="material-symbols-outlined">add</span>
+              Add chart
+            </button>
+          )}
+          <button
+            type="button"
+            className={`btn-customize ${editMode ? "primary" : ""}`}
+            onClick={() => setEditMode(!editMode)}
+          >
+            <span className="material-symbols-outlined">
+              {editMode ? "check" : "tune"}
+            </span>
+            {editMode ? "Done" : "Customize"}
+          </button>
+        </div>
       </div>
 
       <div className="insights-grid">

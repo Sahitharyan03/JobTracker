@@ -17,6 +17,10 @@ const ENTRIES: Entry[] = [
     a: "Press your global hotkey from anywhere (default Option/Alt+Shift+J), or click '+ New Application' in the dashboard. Fill in the popup and save with Cmd/Ctrl+Enter.",
   },
   {
+    q: "How does the Chrome Extension companion work?",
+    a: "The JobTracker Capture Companion automatically detects job postings when you browse LinkedIn, Indeed, Greenhouse, Lever, Ashby, Workday, and standard job boards. When you press the global hotkey (or click New Application), the job details are prefilled instantly. The extension communicates only locally with JobTracker on 127.0.0.1:41724 with zero cloud storage.",
+  },
+  {
     q: "How do I change my hotkeys?",
     a: "Settings > Global Hotkeys. Click a hotkey box, then press the key combo you want — it fills in automatically, no typing required.",
   },

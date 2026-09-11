@@ -1,88 +1,209 @@
-.doc-attach {
+.doc-card {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 8px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  background: var(--bg-card);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+  overflow: hidden;
 }
 
-.doc-attach-header {
+.doc-card:hover {
+  border-color: var(--border-strong);
+}
+
+.doc-card.expanded {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.doc-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--bg-card);
+  transition: background 150ms ease;
+}
+
+.doc-header:hover {
+  background: var(--bg-inset);
+}
+
+.doc-title-group {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.doc-attach-toggle {
-  background: none;
-  padding: 0;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.doc-chevron {
+  font-size: 20px;
+  color: var(--text-faint);
+  transition: transform 150ms ease;
 }
 
-.doc-attach-toggle:hover {
-  background: none;
-  color: var(--accent);
+.doc-chevron.open {
+  transform: rotate(180deg);
 }
 
-.chevron {
-  display: inline-block;
-  transition: transform 120ms ease;
-  font-size: 16px;
-  line-height: 1;
-}
-
-.chevron.open {
-  transform: rotate(90deg);
+.doc-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .doc-attached-badge {
-  font-size: 11px;
+  font-size: 10px;
+  font-weight: 600;
   color: var(--success);
-  background: color-mix(in srgb, var(--success) 12%, transparent);
+  background: var(--success-soft);
+  border: 1px solid rgba(16, 185, 129, 0.3);
   border-radius: 999px;
   padding: 1px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
-.doc-mode-switch {
+.doc-header-actions {
   display: flex;
-  gap: 2px;
-  background: var(--bg-inset);
-  border-radius: var(--radius);
-  padding: 2px;
+  align-items: center;
+  gap: 8px;
 }
 
-.doc-mode-switch button {
-  padding: 3px 10px;
-  font-size: 12px;
+.doc-clear-btn {
   background: none;
+  border: none;
+  font-size: 11px;
+  color: var(--danger);
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
-.doc-mode-switch button.active {
+.doc-clear-btn:hover {
+  background: var(--danger-soft);
+}
+
+.doc-format-toggle {
+  display: flex;
+  background: var(--bg-inset);
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.doc-format-tab {
+  background: none;
+  border: none;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 3px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.doc-format-tab.active {
   background: var(--bg-elevated);
-  box-shadow: var(--shadow);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-.tex-input {
+.doc-body {
+  padding: 0 14px 14px 14px;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 2px;
+  animation: fadeIn 150ms ease;
+}
+
+.doc-tex-textarea {
+  width: 100%;
   font-family: var(--font-mono);
   font-size: 12px;
   min-height: 100px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  padding: 10px;
+  color: var(--text);
+  resize: vertical;
 }
 
-.pdf-picker {
+.doc-pdf-dropzone {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  min-width: 0;
+  justify-content: center;
+  padding: 20px 14px;
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-inset);
+  cursor: pointer;
+  transition: all 150ms ease;
+  text-align: center;
+  gap: 6px;
 }
 
-.pdf-name {
-  font-size: 12px;
-  color: var(--text-secondary);
+.doc-pdf-dropzone:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.doc-pdf-dropzone.has-file {
+  border-color: var(--success);
+  background: var(--success-soft);
+}
+
+.dropzone-icon {
+  font-size: 28px;
+  color: var(--text-faint);
+}
+
+.doc-pdf-dropzone:hover .dropzone-icon {
+  color: var(--accent);
+}
+
+.dropzone-empty-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dropzone-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.dropzone-sub {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.dropzone-file-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dropzone-file-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  max-width: 320px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.dropzone-file-hint {
+  font-size: 11px;
+  color: var(--success);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }

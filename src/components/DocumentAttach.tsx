@@ -1,7 +1,6 @@
 /**
  * Attach a resume or cover letter to an entry — either paste LaTeX source
- * or pick a PDF file, depending on the user's preferred mode (switchable
- * inline per document).
+ * or pick a PDF file, matching the stitch_single_page_job_application_form reference.
  */
 
 import { useState } from "react";
@@ -36,64 +35,97 @@ export default function DocumentAttach({
     }
   };
 
+  const clearDoc = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange({ kind: mode, tex: null, pdfSource: null });
+  };
+
   const attached =
     value.kind === "tex"
       ? Boolean(value.tex?.trim())
       : Boolean(value.pdfSource);
 
   return (
-    <div className="doc-attach">
-      <div className="doc-attach-header">
-        <button
-          type="button"
-          className="doc-attach-toggle"
-          onClick={() => setExpanded(!expanded)}
-        >
-          <span className={`chevron ${expanded ? "open" : ""}`}>›</span>
-          {label}
-          {attached && <span className="doc-attached-badge">attached</span>}
-        </button>
-        {expanded && (
-          <div className="doc-mode-switch">
+    <div className={`doc-card ${expanded ? "expanded" : ""}`}>
+      <header
+        className="doc-header"
+        onClick={() => setExpanded(!expanded)}
+        role="button"
+        tabIndex={0}
+      >
+        <div className="doc-title-group">
+          <span className={`material-symbols-outlined doc-chevron ${expanded ? "open" : ""}`}>
+            expand_more
+          </span>
+          <span className="doc-label">{label}</span>
+          {attached && <span className="doc-attached-badge">Attached</span>}
+        </div>
+
+        <div className="doc-header-actions" onClick={(e) => e.stopPropagation()}>
+          {attached && (
             <button
               type="button"
-              className={mode === "tex" ? "active" : ""}
+              className="doc-clear-btn"
+              onClick={clearDoc}
+              title="Remove attachment"
+            >
+              Clear
+            </button>
+          )}
+          <div className="doc-format-toggle" role="radiogroup">
+            <button
+              type="button"
+              className={`doc-format-tab ${mode === "tex" ? "active" : ""}`}
               onClick={() => onChange({ ...value, kind: "tex", pdfSource: null })}
             >
               .tex
             </button>
             <button
               type="button"
-              className={mode === "pdf" ? "active" : ""}
+              className={`doc-format-tab ${mode === "pdf" ? "active" : ""}`}
               onClick={() => onChange({ ...value, kind: "pdf", tex: null })}
             >
               .pdf
             </button>
           </div>
-        )}
-      </div>
-      {expanded &&
-        (mode === "tex" ? (
-          <textarea
-            className="tex-input"
-            placeholder="Paste LaTeX source here"
-            value={value.tex ?? ""}
-            onChange={(e) =>
-              onChange({ kind: "tex", tex: e.target.value, pdfSource: null })
-            }
-          />
-        ) : (
-          <div className="pdf-picker">
-            <button type="button" onClick={pickPdf}>
-              Choose PDF…
-            </button>
-            {value.pdfSource && (
-              <span className="pdf-name" title={value.pdfSource}>
-                {value.pdfSource.split("/").pop()}
-              </span>
-            )}
-          </div>
-        ))}
+        </div>
+      </header>
+
+      {expanded && (
+        <div className="doc-body">
+          {mode === "tex" ? (
+            <textarea
+              className="doc-tex-textarea"
+              placeholder={`Paste ${label} LaTeX source here...`}
+              value={value.tex ?? ""}
+              rows={4}
+              onChange={(e) =>
+                onChange({ kind: "tex", tex: e.target.value, pdfSource: null })
+              }
+            />
+          ) : (
+            <div
+              className={`doc-pdf-dropzone ${value.pdfSource ? "has-file" : ""}`}
+              onClick={pickPdf}
+            >
+              <span className="material-symbols-outlined dropzone-icon">upload_file</span>
+              {value.pdfSource ? (
+                <div className="dropzone-file-info">
+                  <span className="dropzone-file-name" title={value.pdfSource}>
+                    {value.pdfSource.split("/").pop()?.split("\\").pop()}
+                  </span>
+                  <span className="dropzone-file-hint">Click to change PDF</span>
+                </div>
+              ) : (
+                <div className="dropzone-empty-info">
+                  <span className="dropzone-text">Click to choose {label} PDF</span>
+                  <span className="dropzone-sub">Upload PDF document up to 10MB</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

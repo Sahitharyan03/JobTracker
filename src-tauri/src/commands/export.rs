@@ -11,22 +11,24 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 use tauri::State;
 
-const BUILTIN_COLUMNS: [&str; 11] = [
+const BUILTIN_COLUMNS: [&str; 13] = [
     "Timestamp",
     "Company",
     "Role",
     "Job ID",
     "Portal",
     "Location",
+    "Work Type",
     "Address Used",
     "Phone Number",
     "Salary Expectation",
     "Status",
+    "Job URL",
     "Notes",
 ];
 
 struct ExportRow {
-    builtin: [String; 11],
+    builtin: [String; 13],
     extra: serde_json::Map<String, Value>,
 }
 
@@ -34,14 +36,14 @@ fn collect_rows(conn: &Connection) -> Result<(Vec<String>, Vec<ExportRow>), Stri
     let mut stmt = conn
         .prepare(
             "SELECT created_at, company, role, job_id, portal, location,
-                    address_used, phone, salary_expectation, status, notes, extra
+                    work_type, address_used, phone, salary_expectation, status, job_url, notes, extra
              FROM applications ORDER BY created_at",
         )
         .map_err(|e| e.to_string())?;
 
     let rows: Vec<ExportRow> = stmt
         .query_map([], |r| {
-            let extra_json: String = r.get(11)?;
+            let extra_json: String = r.get(13)?;
             let extra = serde_json::from_str::<Value>(&extra_json)
                 .ok()
                 .and_then(|v| v.as_object().cloned())
@@ -59,6 +61,8 @@ fn collect_rows(conn: &Connection) -> Result<(Vec<String>, Vec<ExportRow>), Stri
                     r.get(8)?,
                     r.get(9)?,
                     r.get(10)?,
+                    r.get(11)?,
+                    r.get(12)?,
                 ],
                 extra,
             })

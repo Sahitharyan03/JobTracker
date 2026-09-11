@@ -78,6 +78,46 @@ export interface Application {
   cover_kind: DocKind | null;
   cover_tex: string | null;
   cover_path: string | null;
+  job_url: string;
+  job_description: string;
+  work_type: string;
+  captured_at: string;
+}
+
+export interface ReusableValue {
+  id: number | null;
+  category: "address" | "phone" | string;
+  label: string;
+  value: string;
+  is_default: boolean;
+  created_at?: string;
+}
+
+export interface DetectedJob {
+  company?: string;
+  role?: string;
+  location?: string;
+  work_type?: "Remote" | "Hybrid" | "On-site" | string;
+  salary?: string;
+  portal?: string;
+  job_id?: string;
+  url: string;
+  description?: string;
+  employment_type?: string;
+  captured_at?: string;
+  tab_id?: number;
+}
+
+export interface CaptureSummary {
+  job: DetectedJob;
+  fields_count: number;
+  is_stale: boolean;
+}
+
+export interface DuplicateCheckResult {
+  is_duplicate: boolean;
+  existing_id: number | null;
+  reason: string | null;
 }
 
 export interface StatusEvent {
@@ -105,6 +145,10 @@ export interface ImportRow {
   extra?: Record<string, unknown>;
   resume_source_path?: string;
   cover_source_path?: string;
+  job_url?: string;
+  job_description?: string;
+  work_type?: string;
+  captured_at?: string;
   replace_id?: number;
 }
 
@@ -138,6 +182,9 @@ export const BUILTIN_KEYS = [
   "phone",
   "salary_expectation",
   "notes",
+  "work_type",
+  "job_url",
+  "job_description",
 ] as const;
 
 export type BuiltinKey = (typeof BUILTIN_KEYS)[number];
@@ -151,3 +198,4 @@ export function parseOptions(field: FieldDefinition): string[] {
     return [];
   }
 }
+

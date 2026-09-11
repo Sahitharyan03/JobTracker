@@ -1,9 +1,12 @@
-.insights {
+.insights-bento-view {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-width: 1100px;
+  max-width: 1360px;
   margin: 0 auto;
+  padding: 16px 24px 36px 24px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .insights-empty {
@@ -15,51 +18,188 @@
   color: var(--text-secondary);
 }
 
-/* Headline numbers */
-
-.insights-headline {
-  display: flex;
-  gap: 12px;
+/* 4 Bento Stat Cards */
+.insights-stats-bento {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
 }
 
-.headline-stat {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
+@media (max-width: 1024px) {
+  .insights-stats-bento {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .insights-stats-bento {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bento-stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  padding: 18px 22px;
+  padding: 16px 18px;
   display: flex;
   flex-direction: column;
+  gap: 12px;
+  box-shadow: var(--shadow-bento);
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bento-stat-card:hover {
+  border-color: var(--border);
   box-shadow: var(--shadow);
+  transform: translateY(-1px);
 }
 
-.headline-stat::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--accent), transparent 70%);
-  opacity: 0.7;
+.stat-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.headline-number {
-  font-size: 34px;
-  font-weight: 700;
+.stat-card-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.stat-icon-wrapper {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-icon-wrapper .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.icon-indigo {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.icon-amber {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.icon-emerald {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.icon-purple {
+  background: rgba(147, 51, 234, 0.12);
+  color: #9333ea;
+}
+
+.stat-card-body {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.stat-card-val {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text);
   letter-spacing: -0.03em;
-  background: linear-gradient(135deg, var(--text), var(--accent));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  line-height: 1;
 }
 
-.headline-caption {
+.stat-val-unit {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.stat-card-pill {
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.pill-indigo {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.pill-amber {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.pill-emerald {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.pill-purple {
+  background: rgba(147, 51, 234, 0.12);
+  color: #9333ea;
+}
+
+.insights-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 2px;
+}
+
+.insights-toolbar-hint {
+  font-size: 12px;
+  font-weight: 500;
   color: var(--text-faint);
+}
+
+.insights-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-add-chart,
+.btn-customize {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.btn-add-chart:hover,
+.btn-customize:hover {
+  background: var(--bg-inset);
+  border-color: var(--border-strong);
+}
+
+.btn-customize.primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.btn-add-chart .material-symbols-outlined,
+.btn-customize .material-symbols-outlined {
+  font-size: 15px;
 }
 
 /* Card grid */
