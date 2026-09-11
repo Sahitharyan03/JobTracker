@@ -1,6 +1,6 @@
 /**
- * The main window: first-run setup wizard until a data folder is chosen,
- * then the dashboard shell — Insights, Applications, and Settings.
+ * The main window shell.
+ * All colours via CSS variables → dark mode works automatically via data-theme="dark".
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -18,7 +18,7 @@ type Tab = "insights" | "applications" | "assistant" | "help" | "settings";
 
 export default function Dashboard() {
   const [ready, setReady] = useState<boolean | null>(null);
-  const [tab, setTab] = useState<Tab>("insights");
+  const [tab, setTab] = useState<Tab>("applications");
 
   const refresh = useCallback(() => {
     api
@@ -33,48 +33,75 @@ export default function Dashboard() {
   if (!ready) return <SetupWizard onComplete={refresh} />;
 
   return (
-    <div className="dashboard">
-      <nav className="dashboard-nav">
-        <div className="dashboard-brand">
-          <span className="dashboard-logo">JT</span>
-          <span className="dashboard-name">Job Tracker</span>
-        </div>
-        <div className="dashboard-tabs">
-          {(
-            [
-              ["insights", "Insights"],
-              ["applications", "Applications"],
-              ["assistant", "Assistant"],
-              ["help", "Help"],
-              ["settings", "Settings"],
-            ] as [Tab, string][]
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              className={`dashboard-tab ${tab === key ? "active" : ""}`}
-              onClick={() => setTab(key)}
+    <div className="dashboard-shell">
+      {/* Top Navigation */}
+      <header className="dash-header" data-tauri-drag-region>
+        <div className="dash-header-inner" data-tauri-drag-region>
+          <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
+            {/* Logo */}
+            <div
+              className="dash-logo"
+              onClick={() => setTab("insights")}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === "Enter" && setTab("insights")}
             >
-              {label}
+              <div className="dash-logo-badge">JT</div>
+              <span className="dash-logo-name">Job Tracker</span>
+            </div>
+
+            {/* Navigation Pills */}
+            <nav className="dash-nav">
+              {(
+                [
+                  ["insights", "Insights"],
+                  ["applications", "Applications"],
+                  ["assistant", "Assistant"],
+                  ["help", "Help"],
+                  ["settings", "Settings"],
+                ] as [Tab, string][]
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`dash-nav-pill${tab === key ? " active" : ""}`}
+                  onClick={() => setTab(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </nav>
+          </div>
+
+          {/* Right Actions */}
+          <div className="dash-actions">
+            <button
+              className="dash-new-btn"
+              type="button"
+              onClick={() => api.openPopup()}
+              title="Add a new application"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add</span>
+              <span>New Application</span>
             </button>
-          ))}
+
+            <span className="dash-byline hidden sm:inline-block">BY MJKR</span>
+
+            <ThemeToggle />
+          </div>
         </div>
-        <button
-          className="primary dashboard-add"
-          onClick={() => api.openPopup()}
-          title="Log a new application (same as the global hotkey)"
-        >
-          + New Application
-        </button>
-        <span className="dashboard-credit">by MJKR</span>
-        <ThemeToggle />
-      </nav>
-      <main className="dashboard-main">
+      </header>
+
+      {/* Main Viewport */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", width: "100%" }}>
         {tab === "insights" && <Insights />}
-        {tab === "applications" && <Applications />}
+        {tab === "applications" && (
+          <Applications onNewApplication={() => api.openPopup()} />
+        )}
         {tab === "assistant" && <Assistant />}
         {tab === "help" && <Help />}
         {tab === "settings" && <Settings />}
-      </main>
+      </div>
     </div>
   );
 }

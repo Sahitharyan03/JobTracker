@@ -1,16 +1,21 @@
+mod capture;
 mod commands;
 mod config;
 mod db;
 mod hotkeys;
+mod server;
 
 use db::Db;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let capture_state = capture::new_capture_state();
+    let server_capture_state = Arc::clone(&capture_state);
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -19,7 +24,7 @@ pub fn run() {
             // A second launch just fronts the existing dashboard.
             hotkeys::show_dashboard(app);
         }))
-        .setup(|app| {
+        .setup(move |app| {
             // Reopen the database automatically when a data directory was
             // chosen in an earlier run; otherwise the frontend shows the
             // first-run setup wizard.
@@ -28,6 +33,19 @@ pub fn run() {
                 db::open(dir)
                     .map_err(|e| eprintln!("failed to open database: {e}"))
                     .ok()
+            });
+
+            // Start loopback server for Chrome Extension integration
+            let token = if let Some(c) = &conn {
+                setting(c, "extension_token").unwrap_or_else(|| "jt_default_local_token".into())
+            } else {
+                "jt_default_local_token".into()
+            };
+
+            server::start_server(server::ServerConfig {
+                port: server::DEFAULT_SERVER_PORT,
+                token: Arc::new(token),
+                capture_state: server_capture_state,
             });
 
             // Only register global shortcuts for a returning user (setup
@@ -45,6 +63,7 @@ pub fn run() {
             }
 
             app.manage(Db(Mutex::new(conn)));
+            app.manage(capture_state);
 
             // Tray icon so the app stays reachable while backgrounded —
             // closing the dashboard hides it, and the global hotkeys keep
@@ -90,6 +109,16 @@ pub fn run() {
             commands::applications::update_application,
             commands::applications::delete_application,
             commands::applications::list_status_events,
+            commands::applications::check_duplicate_application,
+            commands::reusable_values::list_reusable_values,
+            commands::reusable_values::save_reusable_value,
+            commands::reusable_values::delete_reusable_value,
+            commands::capture::get_latest_job_capture,
+            commands::capture::clear_latest_job_capture,
+            commands::capture::get_extension_token,
+            commands::capture::generate_new_extension_token,
+            commands::capture::get_or_export_extension_dir,
+            commands::capture::open_extension_folder,
             commands::documents::import_pdf,
             commands::documents::resolve_document_path,
             commands::export::export_csv,

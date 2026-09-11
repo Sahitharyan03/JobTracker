@@ -4,7 +4,63 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri + React + Typescript</title>
+    <title>Job Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#4f46e5",
+              "primary-hover": "#4338ca",
+              "primary-light": "#eef2ff",
+              "primary-container": "#4f46e5",
+              "on-primary-container": "#dad7ff",
+              "primary-fixed": "#e2dfff",
+              "secondary": "#006c49",
+              "secondary-container": "#6cf8bb",
+              "on-secondary-container": "#00714d",
+              "tertiary": "#684000",
+              "tertiary-container": "#ffddb8",
+              "surface": "#ffffff",
+              "surface-container": "#f8faff",
+              "surface-container-high": "#e2e7ff",
+              "surface-container-highest": "#dae2fd",
+              "surface-container-low": "#f2f3ff",
+              "surface-container-lowest": "#ffffff",
+              "outline": "#777587",
+              "outline-variant": "#c7c4d8",
+              "on-surface": "#131b2e",
+              "on-surface-variant": "#464555",
+              "error": "#ba1a1a",
+              "error-container": "#ffdad6",
+              "text-main": "#0f172a",
+              "text-muted": "#64748b",
+              "text-soft": "#94a3b8",
+              "border-subtle": "#e2e8f0",
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              display: ['Plus Jakarta Sans', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace'],
+            },
+            borderRadius: {
+              '2xl': '1rem',
+              '3xl': '1.5rem',
+            },
+            boxShadow: {
+              'bento': '0 1px 3px rgba(19, 27, 46, 0.03), 0 6px 16px -4px rgba(19, 27, 46, 0.04)',
+              'glow-primary': '0 0 20px -5px rgba(79, 70, 229, 0.25)',
+            }
+          },
+        },
+      }
+    </script>
   </head>
 
   <body>

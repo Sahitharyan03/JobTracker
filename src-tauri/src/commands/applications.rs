@@ -42,6 +42,14 @@ pub struct Application {
     pub cover_kind: Option<String>,
     pub cover_tex: Option<String>,
     pub cover_path: Option<String>,
+    #[serde(default)]
+    pub job_url: String,
+    #[serde(default)]
+    pub job_description: String,
+    #[serde(default)]
+    pub work_type: String,
+    #[serde(default)]
+    pub captured_at: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -77,6 +85,14 @@ pub struct NewApplication {
     pub cover_kind: Option<String>,
     pub cover_tex: Option<String>,
     pub cover_path: Option<String>,
+    #[serde(default)]
+    pub job_url: String,
+    #[serde(default)]
+    pub job_description: String,
+    #[serde(default)]
+    pub work_type: String,
+    #[serde(default)]
+    pub captured_at: String,
 }
 
 fn with_conn<T>(
@@ -110,6 +126,10 @@ fn row_to_application(r: &rusqlite::Row) -> rusqlite::Result<Application> {
         cover_kind: r.get("cover_kind")?,
         cover_tex: r.get("cover_tex")?,
         cover_path: r.get("cover_path")?,
+        job_url: r.get("job_url").unwrap_or_default(),
+        job_description: r.get("job_description").unwrap_or_default(),
+        work_type: r.get("work_type").unwrap_or_default(),
+        captured_at: r.get("captured_at").unwrap_or_default(),
     })
 }
 
@@ -122,9 +142,10 @@ pub fn create_application(app: NewApplication, db: State<Db>) -> Result<i64, Str
             "INSERT INTO applications
              (created_at, company, role, job_id, portal, location, address_used,
               phone, salary_expectation, status, notes, extra,
-              resume_kind, resume_tex, resume_path, cover_kind, cover_tex, cover_path)
+              resume_kind, resume_tex, resume_path, cover_kind, cover_tex, cover_path,
+              job_url, job_description, work_type, captured_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'applied', ?10, ?11,
-                     ?12, ?13, ?14, ?15, ?16, ?17)",
+                     ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
             params![
                 now,
                 app.company,
@@ -143,6 +164,10 @@ pub fn create_application(app: NewApplication, db: State<Db>) -> Result<i64, Str
                 app.cover_kind,
                 app.cover_tex,
                 app.cover_path,
+                app.job_url,
+                app.job_description,
+                app.work_type,
+                app.captured_at,
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -213,8 +238,9 @@ pub fn update_application(app: Application, db: State<Db>) -> Result<(), String>
                    company = ?1, role = ?2, job_id = ?3, portal = ?4, location = ?5,
                    address_used = ?6, phone = ?7, salary_expectation = ?8, notes = ?9,
                    extra = ?10, resume_kind = ?11, resume_tex = ?12, resume_path = ?13,
-                   cover_kind = ?14, cover_tex = ?15, cover_path = ?16
-                 WHERE id = ?17",
+                   cover_kind = ?14, cover_tex = ?15, cover_path = ?16,
+                   job_url = ?17, job_description = ?18, work_type = ?19, captured_at = ?20
+                 WHERE id = ?21",
                 params![
                     app.company,
                     app.role,
@@ -232,6 +258,10 @@ pub fn update_application(app: Application, db: State<Db>) -> Result<(), String>
                     app.cover_kind,
                     app.cover_tex,
                     app.cover_path,
+                    app.job_url,
+                    app.job_description,
+                    app.work_type,
+                    app.captured_at,
                     id,
                 ],
             )
@@ -240,6 +270,95 @@ pub fn update_application(app: Application, db: State<Db>) -> Result<(), String>
             return Err(format!("no application with id {id}"));
         }
         Ok(())
+    })
+}
+
+#[derive(Debug, Serialize)]
+pub struct DuplicateCheckResult {
+    pub is_duplicate: bool,
+    pub existing_id: Option<i64>,
+    pub reason: Option<String>,
+}
+
+/// Checks whether an application might already exist, based on URL,
+/// Company + Job ID, or Company + Role.
+#[tauri::command]
+pub fn check_duplicate_application(
+    company: String,
+    role: String,
+    job_url: Option<String>,
+    job_id: Option<String>,
+    db: State<Db>,
+) -> Result<DuplicateCheckResult, String> {
+    with_conn(&db, |conn| {
+        let trimmed_company = company.trim();
+        let trimmed_role = role.trim();
+        let trimmed_url = job_url.as_deref().unwrap_or("").trim();
+        let trimmed_id = job_id.as_deref().unwrap_or("").trim();
+
+        // 1. Check exact URL if provided
+        if !trimmed_url.is_empty() {
+            let mut stmt = conn
+                .prepare("SELECT id FROM applications WHERE job_url = ?1 LIMIT 1")
+                .map_err(|e| e.to_string())?;
+            if let Ok(id) = stmt.query_row([trimmed_url], |r| r.get::<_, i64>(0)) {
+                return Ok(DuplicateCheckResult {
+                    is_duplicate: true,
+                    existing_id: Some(id),
+                    reason: Some(
+                        "An application with the exact same Job URL already exists.".into(),
+                    ),
+                });
+            }
+        }
+
+        // 2. Check Company + Job ID if Job ID provided
+        if !trimmed_id.is_empty() && !trimmed_company.is_empty() {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT id FROM applications
+                     WHERE LOWER(company) = LOWER(?1) AND job_id = ?2
+                     LIMIT 1",
+                )
+                .map_err(|e| e.to_string())?;
+            if let Ok(id) =
+                stmt.query_row(params![trimmed_company, trimmed_id], |r| r.get::<_, i64>(0))
+            {
+                return Ok(DuplicateCheckResult {
+                    is_duplicate: true,
+                    existing_id: Some(id),
+                    reason: Some(format!("An application for {trimmed_company} with Job ID {trimmed_id} already exists.")),
+                });
+            }
+        }
+
+        // 3. Check Company + Role
+        if !trimmed_company.is_empty() && !trimmed_role.is_empty() {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT id FROM applications
+                     WHERE LOWER(company) = LOWER(?1) AND LOWER(role) = LOWER(?2)
+                     LIMIT 1",
+                )
+                .map_err(|e| e.to_string())?;
+            if let Ok(id) = stmt.query_row(params![trimmed_company, trimmed_role], |r| {
+                r.get::<_, i64>(0)
+            }) {
+                return Ok(DuplicateCheckResult {
+                    is_duplicate: true,
+                    existing_id: Some(id),
+                    reason: Some(format!(
+                        "You already applied for {trimmed_role} at {trimmed_company}."
+                    )),
+                });
+            }
+        }
+
+        Ok(DuplicateCheckResult {
+            is_duplicate: false,
+            existing_id: None,
+            reason: None,
+        })
     })
 }
 

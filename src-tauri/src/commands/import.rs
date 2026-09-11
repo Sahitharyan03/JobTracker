@@ -7,11 +7,11 @@
 
 use crate::db::Db;
 use calamine::{open_workbook_auto, Data, Reader};
-use chrono::Local;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use tauri::State;
 
 #[derive(Debug, Serialize)]
 pub struct ParsedTable {
@@ -126,6 +126,14 @@ pub struct ImportRow {
     pub resume_source_path: Option<String>,
     #[serde(default)]
     pub cover_source_path: Option<String>,
+    #[serde(default)]
+    pub job_url: String,
+    #[serde(default)]
+    pub job_description: String,
+    #[serde(default)]
+    pub work_type: String,
+    #[serde(default)]
+    pub captured_at: String,
     /// Set when the user chose "Replace" for a detected duplicate.
     #[serde(default)]
     pub replace_id: Option<i64>,
@@ -158,143 +166,174 @@ fn copy_import_document(
             .collect();
         let trimmed = cleaned.trim_matches('-').to_string();
         if trimmed.is_empty() {
-            "untitled".to_string()
+            "document".to_string()
         } else {
             trimmed
         }
     };
-    let base = format!(
-        "{}_{}_{}_{}",
-        Local::now().format("%Y-%m-%d"),
-        sanitize(company),
-        sanitize(role),
-        doc_type
-    );
-    let mut name = format!("{base}.pdf");
-    let mut n = 1;
-    while dir.join(&name).exists() {
-        n += 1;
-        name = format!("{base}-{n}.pdf");
-    }
-    std::fs::copy(&source_path, dir.join(&name)).ok()?;
-    Some(format!("documents/{name}"))
+    let company_clean = sanitize(company);
+    let role_clean = sanitize(role);
+    let dest_name = format!("{company_clean}_{role_clean}_{doc_type}.pdf");
+    let dest = dir.join(&dest_name);
+    std::fs::copy(&source_path, &dest).ok()?;
+    Some(format!("documents/{dest_name}"))
 }
 
 #[tauri::command]
-pub fn import_applications(
-    rows: Vec<ImportRow>,
-    db: tauri::State<Db>,
-) -> Result<ImportSummary, String> {
-    let cfg = crate::config::load();
-    let data_dir = cfg.data_dir.ok_or("no data directory configured")?;
-
+pub fn import_applications(rows: Vec<ImportRow>, db: State<Db>) -> Result<ImportSummary, String> {
     let guard = db.0.lock().unwrap();
     let conn = guard.as_ref().ok_or("database not initialized")?;
 
+    let data_dir: PathBuf = conn
+        .query_row("PRAGMA database_list", [], |r| {
+            let path: String = r.get(2)?;
+            Ok(PathBuf::from(path))
+        })
+        .map_err(|e| e.to_string())?
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or("could not determine data folder")?;
+
     let mut summary = ImportSummary::default();
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
 
-    for row in rows {
-        let result = (|| -> Result<(), String> {
-            let extra = serde_json::to_string(&row.extra).map_err(|e| e.to_string())?;
-            let status = row.status.clone().unwrap_or_else(|| "applied".to_string());
-            if !crate::commands::applications::STATUSES.contains(&status.as_str()) {
-                return Err(format!("unknown status: {status}"));
+    for (index, row) in rows.into_iter().enumerate() {
+        let row_num = index + 1;
+        if row.company.trim().is_empty() || row.role.trim().is_empty() {
+            summary
+                .errors
+                .push(format!("Row {row_num}: company and role are required"));
+            continue;
+        }
+
+        let extra = match serde_json::to_string(&row.extra) {
+            Ok(s) => s,
+            Err(e) => {
+                summary
+                    .errors
+                    .push(format!("Row {row_num}: invalid extra data: {e}"));
+                continue;
             }
+        };
 
-            let resume = row.resume_source_path.as_deref().and_then(|src| {
-                copy_import_document(&data_dir, src, &row.company, &row.role, "Resume")
-            });
-            let cover = row.cover_source_path.as_deref().and_then(|src| {
-                copy_import_document(&data_dir, src, &row.company, &row.role, "CoverLetter")
-            });
+        let status = row.status.unwrap_or_else(|| "applied".into());
+        if !crate::commands::applications::STATUSES.contains(&status.as_str()) {
+            summary
+                .errors
+                .push(format!("Row {row_num}: unknown status: {status}"));
+            continue;
+        }
 
-            if let Some(id) = row.replace_id {
-                let updated = conn
-                    .execute(
-                        "UPDATE applications SET
-                           created_at = ?1, company = ?2, role = ?3, job_id = ?4,
-                           portal = ?5, location = ?6, address_used = ?7, phone = ?8,
-                           salary_expectation = ?9, status = ?10, notes = ?11, extra = ?12,
-                           resume_kind = COALESCE(?13, resume_kind),
-                           resume_path = COALESCE(?14, resume_path),
-                           cover_kind = COALESCE(?15, cover_kind),
-                           cover_path = COALESCE(?16, cover_path)
-                         WHERE id = ?17",
-                        params![
-                            row.created_at,
-                            row.company,
-                            row.role,
-                            row.job_id,
-                            row.portal,
-                            row.location,
-                            row.address_used,
-                            row.phone,
-                            row.salary_expectation,
-                            status,
-                            row.notes,
-                            extra,
-                            resume.as_ref().map(|_| "pdf"),
-                            resume,
-                            cover.as_ref().map(|_| "pdf"),
-                            cover,
-                            id,
-                        ],
-                    )
-                    .map_err(|e| e.to_string())?;
-                if updated == 0 {
-                    return Err(format!("no application with id {id} to replace"));
+        let resume = row.resume_source_path.as_deref().and_then(|src| {
+            copy_import_document(&data_dir, src, &row.company, &row.role, "Resume")
+        });
+        let cover = row.cover_source_path.as_deref().and_then(|src| {
+            copy_import_document(&data_dir, src, &row.company, &row.role, "CoverLetter")
+        });
+
+        if let Some(id) = row.replace_id {
+            let updated = tx.execute(
+                "UPDATE applications SET
+                       created_at = ?1, company = ?2, role = ?3, job_id = ?4,
+                       portal = ?5, location = ?6, address_used = ?7, phone = ?8,
+                       salary_expectation = ?9, status = ?10, notes = ?11, extra = ?12,
+                       resume_kind = COALESCE(?13, resume_kind),
+                       resume_path = COALESCE(?14, resume_path),
+                       cover_kind = COALESCE(?15, cover_kind),
+                       cover_path = COALESCE(?16, cover_path),
+                       job_url = ?17, job_description = ?18, work_type = ?19, captured_at = ?20
+                     WHERE id = ?21",
+                params![
+                    row.created_at,
+                    row.company,
+                    row.role,
+                    row.job_id,
+                    row.portal,
+                    row.location,
+                    row.address_used,
+                    row.phone,
+                    row.salary_expectation,
+                    status,
+                    row.notes,
+                    extra,
+                    resume.as_ref().map(|_| "pdf"),
+                    resume,
+                    cover.as_ref().map(|_| "pdf"),
+                    cover,
+                    row.job_url,
+                    row.job_description,
+                    row.work_type,
+                    row.captured_at,
+                    id,
+                ],
+            );
+            match updated {
+                Ok(0) => {
+                    summary.errors.push(format!(
+                        "Row {row_num}: no application with id {id} to replace"
+                    ));
+                    continue;
                 }
-                conn.execute(
-                    "INSERT INTO status_events (application_id, status, changed_at)
-                     VALUES (?1, ?2, ?3)",
-                    params![id, status, row.created_at],
-                )
-                .map_err(|e| e.to_string())?;
-                summary.replaced += 1;
-            } else {
-                conn.execute(
-                    "INSERT INTO applications
-                     (created_at, company, role, job_id, portal, location, address_used,
-                      phone, salary_expectation, status, notes, extra,
-                      resume_kind, resume_path, cover_kind, cover_path)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12,
-                             ?13, ?14, ?15, ?16)",
-                    params![
-                        row.created_at,
-                        row.company,
-                        row.role,
-                        row.job_id,
-                        row.portal,
-                        row.location,
-                        row.address_used,
-                        row.phone,
-                        row.salary_expectation,
-                        status,
-                        row.notes,
-                        extra,
-                        resume.as_ref().map(|_| "pdf"),
-                        resume,
-                        cover.as_ref().map(|_| "pdf"),
-                        cover,
-                    ],
-                )
-                .map_err(|e| e.to_string())?;
-                let id = conn.last_insert_rowid();
-                conn.execute(
-                    "INSERT INTO status_events (application_id, status, changed_at)
-                     VALUES (?1, ?2, ?3)",
-                    params![id, status, row.created_at],
-                )
-                .map_err(|e| e.to_string())?;
-                summary.inserted += 1;
+                Ok(_) => {
+                    let _ = tx.execute(
+                        "INSERT INTO status_events (application_id, status, changed_at) VALUES (?1, ?2, ?3)",
+                        params![id, status, row.created_at],
+                    );
+                    summary.replaced += 1;
+                }
+                Err(e) => {
+                    summary.errors.push(format!("Row {row_num}: {e}"));
+                    continue;
+                }
             }
-            Ok(())
-        })();
-
-        if let Err(e) = result {
-            summary.errors.push(e);
+        } else {
+            let res = tx.execute(
+                "INSERT INTO applications
+                 (created_at, company, role, job_id, portal, location, address_used,
+                  phone, salary_expectation, status, notes, extra,
+                  resume_kind, resume_path, cover_kind, cover_path,
+                  job_url, job_description, work_type, captured_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12,
+                         ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
+                params![
+                    row.created_at,
+                    row.company,
+                    row.role,
+                    row.job_id,
+                    row.portal,
+                    row.location,
+                    row.address_used,
+                    row.phone,
+                    row.salary_expectation,
+                    status,
+                    row.notes,
+                    extra,
+                    resume.as_ref().map(|_| "pdf"),
+                    resume,
+                    cover.as_ref().map(|_| "pdf"),
+                    cover,
+                    row.job_url,
+                    row.job_description,
+                    row.work_type,
+                    row.captured_at,
+                ],
+            );
+            match res {
+                Ok(_) => {
+                    let new_id = tx.last_insert_rowid();
+                    let _ = tx.execute(
+                        "INSERT INTO status_events (application_id, status, changed_at) VALUES (?1, ?2, ?3)",
+                        params![new_id, status, row.created_at],
+                    );
+                    summary.inserted += 1;
+                }
+                Err(e) => {
+                    summary.errors.push(format!("Row {row_num}: {e}"));
+                }
+            }
         }
     }
 
+    tx.commit().map_err(|e| e.to_string())?;
     Ok(summary)
 }
