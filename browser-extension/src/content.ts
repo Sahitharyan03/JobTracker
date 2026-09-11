@@ -6,20 +6,17 @@ let lastJobJson = "";
 let debounceTimer: number | null = null;
 
 function scanAndNotify() {
-  if (window.top !== window.self) {
-    // Only run in top window unless greenhouse/lever iframe
-    const isEmbed = window.location.href.includes("greenhouse") || window.location.href.includes("lever");
-    if (!isEmbed) return;
-  }
-
+  const isIframe = window.top !== window.self;
   const currentUrl = window.location.href;
   const job = extractJobFromDocument(document, currentUrl);
 
   if (!job) {
-    chrome.runtime.sendMessage({
-      type: "JOB_CLEARED",
-      url: currentUrl,
-    }).catch(() => {});
+    if (!isIframe) {
+      chrome.runtime.sendMessage({
+        type: "JOB_CLEARED",
+        url: currentUrl,
+      }).catch(() => {});
+    }
     return;
   }
 

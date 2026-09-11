@@ -19,7 +19,7 @@ type Tab = "insights" | "applications" | "assistant" | "help" | "settings";
 
 export default function Dashboard() {
   const [ready, setReady] = useState<boolean | null>(null);
-  const [tab, setTab] = useState<Tab>("insights");
+  const [tab, setTab] = useState<Tab>("applications");
 
   const refresh = useCallback(() => {
     api

@@ -36,11 +36,16 @@ const KANBAN_STAGES: { status: Status; label: string; color: string }[] =
 function formatTimestamp(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, {
+  const dateStr = d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
+  const timeStr = d.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${dateStr} at ${timeStr}`;
 }
 
 function timeAgo(iso: string): string {
@@ -58,8 +63,10 @@ export default function Applications({ onNewApplication }: Props) {
   const [apps, setApps] = useState<Application[]>([]);
   const [fields, setFields] = useState<FieldDefinition[]>([]);
   const [query, setQuery] = useState("");
-  const [viewMode, setViewMode] = useState<"kanban" | "table">("kanban");
+  const [viewMode, setViewMode] = useState<"kanban" | "table">("table");
   const [stageFilter, setStageFilter] = useState<string>("all");
+  const [selectedAppId, setSelectedAppId] = useState<number | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(true);
   const [editing, setEditing] = useState<Application | null>(null);
   const [editValues, setEditValues] = useState<FormValues | null>(null);
   const [notice, setNotice] = useState("");
@@ -102,6 +109,14 @@ export default function Applications({ onNewApplication }: Props) {
     }
     return counts;
   }, [apps]);
+
+  const selectedApp = useMemo(() => {
+    if (selectedAppId != null) {
+      const found = apps.find((a) => a.id === selectedAppId);
+      if (found) return found;
+    }
+    return filtered.length > 0 ? filtered[0] : (apps.length > 0 ? apps[0] : null);
+  }, [apps, filtered, selectedAppId]);
 
   const changeStatus = async (app: Application, status: Status) => {
     if (app.id == null) return;
@@ -421,92 +436,286 @@ export default function Applications({ onNewApplication }: Props) {
           })}
         </div>
       ) : (
-        /* TABLE / LIST VIEW */
-        <div className="table-card-wrapper">
-          <table className="modern-apps-table">
-            <thead>
-              <tr>
-                <th>Applied</th>
-                <th>Company</th>
-                <th>Role</th>
-                <th>Portal</th>
-                <th>Location</th>
-                <th>Work Type</th>
-                <th>Salary</th>
-                <th>Status</th>
-                <th>Docs</th>
-                <th className="th-actions">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((app) => (
-                <tr key={app.id}>
-                  <td className="cell-date" title={app.created_at}>
-                    {formatTimestamp(app.created_at)}
-                  </td>
-                  <td className="cell-company">
-                    <span className="company-logo-text">
-                      {app.company.slice(0, 2).toUpperCase()}
-                    </span>
-                    <span className="company-name-bold">{app.company}</span>
-                  </td>
-                  <td className="cell-role">{app.role}</td>
-                  <td>
-                    <span className="cell-portal-pill">{app.portal || "—"}</span>
-                  </td>
-                  <td className="cell-loc">{app.location || "—"}</td>
-                  <td>
-                    <span className="cell-work-pill">{app.work_type || "—"}</span>
-                  </td>
-                  <td className="cell-salary">{app.salary_expectation || "—"}</td>
-                  <td>
-                    <StatusBadge
-                      status={app.status}
-                      onChange={(s) => changeStatus(app, s)}
-                    />
-                  </td>
-                  <td className="cell-docs">
-                    {app.resume_kind && (
-                      <button
-                        type="button"
-                        className="doc-badge-btn"
-                        title="View Resume"
-                        onClick={() => setViewing({ app, slot: "resume" })}
-                      >
-                        R
-                      </button>
-                    )}
-                    {app.cover_kind && (
-                      <button
-                        type="button"
-                        className="doc-badge-btn"
-                        title="View Cover Letter"
-                        onClick={() => setViewing({ app, slot: "cover" })}
-                      >
-                        C
-                      </button>
-                    )}
-                  </td>
-                  <td className="cell-table-actions">
-                    <button
-                      type="button"
-                      className="table-btn-edit"
-                      onClick={() => startEdit(app)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="table-btn-delete"
-                      onClick={() => remove(app)}
-                    >
-                      Delete
-                    </button>
-                  </td>
+        /* TABLE / LIST VIEW WITH SIDE DETAILS DRAWER */
+        <div className="table-layout-container">
+          <div className="table-card-wrapper">
+            <table className="modern-apps-table">
+              <thead>
+                <tr>
+                  <th style={{ width: "180px" }}>Applied</th>
+                  <th>Company</th>
+                  <th>Role</th>
+                  <th style={{ width: "120px" }}>Portal</th>
+                  <th style={{ width: "140px" }}>Location</th>
+                  <th style={{ width: "130px" }}>Status</th>
+                  <th style={{ width: "70px" }}>Docs</th>
+                  <th className="th-actions" style={{ width: "80px" }}>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((app) => (
+                  <tr
+                    key={app.id}
+                    className={`app-table-row ${selectedApp?.id === app.id && drawerOpen ? "row-selected" : ""}`}
+                    onClick={() => {
+                      setSelectedAppId(app.id ?? null);
+                      setDrawerOpen(true);
+                    }}
+                  >
+                    <td className="cell-date" title={app.created_at}>
+                      {formatTimestamp(app.created_at)}
+                    </td>
+                    <td className="cell-company">
+                      <span className="company-logo-text">
+                        {app.company ? app.company.slice(0, 2).toUpperCase() : "JT"}
+                      </span>
+                      <span className="company-name-bold">{app.company}</span>
+                    </td>
+                    <td className="cell-role">{app.role}</td>
+                    <td>
+                      <span className="cell-portal-pill">{app.portal || "Direct"}</span>
+                    </td>
+                    <td className="cell-loc">
+                      {app.work_type === "Remote" || (app.location && app.location.toLowerCase().includes("remote")) ? (
+                        <span className="remote-loc-indicator">
+                          <span className="remote-dot"></span>
+                          {app.location || "Remote"}
+                        </span>
+                      ) : (
+                        app.location || "—"
+                      )}
+                    </td>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <StatusBadge
+                        status={app.status}
+                        onChange={(s) => changeStatus(app, s)}
+                      />
+                    </td>
+                    <td className="cell-docs" onClick={(e) => e.stopPropagation()}>
+                      {app.resume_kind && (
+                        <button
+                          type="button"
+                          className="doc-badge-btn"
+                          title="View Resume"
+                          onClick={() => setViewing({ app, slot: "resume" })}
+                        >
+                          R
+                        </button>
+                      )}
+                      {app.cover_kind && (
+                        <button
+                          type="button"
+                          className="doc-badge-btn"
+                          title="View Cover Letter"
+                          onClick={() => setViewing({ app, slot: "cover" })}
+                        >
+                          C
+                        </button>
+                      )}
+                    </td>
+                    <td className="cell-table-actions" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        className="table-btn-edit"
+                        onClick={() => startEdit(app)}
+                        title="Edit application"
+                      >
+                        <span className="material-symbols-outlined">edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="table-btn-delete"
+                        onClick={() => remove(app)}
+                        title="Delete application"
+                      >
+                        <span className="material-symbols-outlined">delete</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Side Details Panel matching stitch_applicant_tracking_kanban_dashboard */}
+          {drawerOpen && selectedApp && (
+            <aside className="side-drawer" id="side-drawer">
+              {/* Panel Header */}
+              <div className="drawer-header">
+                <div className="drawer-header-left">
+                  <div className="drawer-badge-group">
+                    <span
+                      className="drawer-badge"
+                      style={{
+                        backgroundColor: `${STATUS_COLORS[selectedApp.status]}18`,
+                        color: STATUS_COLORS[selectedApp.status],
+                      }}
+                    >
+                      {STATUS_LABELS[selectedApp.status]}
+                    </span>
+                    <span className="drawer-portal">{selectedApp.portal || "Direct"}</span>
+                  </div>
+                  <h2 className="drawer-company">{selectedApp.company}</h2>
+                  <p className="drawer-role">{selectedApp.role}</p>
+                </div>
+                <button
+                  type="button"
+                  className="drawer-close-btn"
+                  onClick={() => setDrawerOpen(false)}
+                  title="Close details"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+
+              {/* Panel Body */}
+              <div className="drawer-body">
+                {/* Key Meta Bar */}
+                <div className="drawer-meta-grid">
+                  <div className="drawer-meta-col">
+                    <span className="drawer-meta-label">Location</span>
+                    <span className="drawer-meta-val">{selectedApp.location || "Not specified"}</span>
+                  </div>
+                  <div className="drawer-meta-col">
+                    <span className="drawer-meta-label">Target Salary</span>
+                    <span className="drawer-meta-val">{selectedApp.salary_expectation || "—"}</span>
+                  </div>
+                </div>
+
+                {/* Submission Contact */}
+                <div className="drawer-section">
+                  <h3 className="drawer-section-title">
+                    <span className="material-symbols-outlined">person</span>
+                    Submission Contact
+                  </h3>
+                  <div className="drawer-contact-list">
+                    <div className="drawer-contact-item">
+                      <span className="material-symbols-outlined">mail</span>
+                      <span className="drawer-contact-val">
+                        {(selectedApp.extra?.["email"] as string) || (selectedApp.extra?.["contact_email"] as string) || "Not specified"}
+                      </span>
+                    </div>
+                    <div className="drawer-contact-item">
+                      <span className="material-symbols-outlined">call</span>
+                      <span className="drawer-contact-val">
+                        {selectedApp.phone || (selectedApp.extra?.["phone"] as string) || "Not specified"}
+                      </span>
+                    </div>
+                    <div className="drawer-contact-item">
+                      <span className="material-symbols-outlined">home_pin</span>
+                      <span className="drawer-contact-val">
+                        {selectedApp.address_used || selectedApp.notes || (selectedApp.extra?.["address"] as string) || "No notes or address provided"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Attached Documents Section */}
+                <div className="drawer-section">
+                  <h3 className="drawer-section-title">
+                    <span className="material-symbols-outlined">description</span>
+                    Attached Documents
+                  </h3>
+                  <div className="drawer-doc-list">
+                    {selectedApp.resume_kind && (
+                      <div className="drawer-doc-card">
+                        <div className="drawer-doc-info">
+                          <div className="drawer-doc-badge">
+                            {selectedApp.resume_kind.toUpperCase()}
+                          </div>
+                          <div className="drawer-doc-names">
+                            <p className="drawer-doc-title">
+                              {selectedApp.company.replace(/\s+/g, "_")}_Resume.{selectedApp.resume_kind === "pdf" ? "pdf" : "tex"}
+                            </p>
+                            <p className="drawer-doc-sub">Resume Attached</p>
+                          </div>
+                        </div>
+                        <div className="drawer-doc-actions">
+                          <button
+                            type="button"
+                            className="drawer-icon-btn"
+                            title="View Document"
+                            onClick={() => setViewing({ app: selectedApp, slot: "resume" })}
+                          >
+                            <span className="material-symbols-outlined">visibility</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedApp.cover_kind && (
+                      <div className="drawer-doc-card">
+                        <div className="drawer-doc-info">
+                          <div className="drawer-doc-badge cover">
+                            {selectedApp.cover_kind.toUpperCase()}
+                          </div>
+                          <div className="drawer-doc-names">
+                            <p className="drawer-doc-title">
+                              CoverLetter_{selectedApp.company.replace(/\s+/g, "_")}.{selectedApp.cover_kind === "pdf" ? "pdf" : "tex"}
+                            </p>
+                            <p className="drawer-doc-sub">Cover Letter Attached</p>
+                          </div>
+                        </div>
+                        <div className="drawer-doc-actions">
+                          <button
+                            type="button"
+                            className="drawer-icon-btn"
+                            title="View Document"
+                            onClick={() => setViewing({ app: selectedApp, slot: "cover" })}
+                          >
+                            <span className="material-symbols-outlined">visibility</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {!selectedApp.resume_kind && !selectedApp.cover_kind && (
+                      <p className="drawer-no-docs">No documents attached.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Stage Transition */}
+                <div className="drawer-section">
+                  <h3 className="drawer-section-title">
+                    <span className="material-symbols-outlined">swap_horiz</span>
+                    Move Stage
+                  </h3>
+                  <select
+                    className="drawer-stage-select"
+                    value={selectedApp.status}
+                    onChange={(e) => changeStatus(selectedApp, e.target.value as Status)}
+                  >
+                    {STATUSES.map((s: Status) => (
+                      <option key={s} value={s}>
+                        {STATUS_LABELS[s]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Drawer Footer Actions */}
+              <div className="drawer-footer">
+                <button
+                  type="button"
+                  className="drawer-btn-edit"
+                  onClick={() => startEdit(selectedApp)}
+                >
+                  <span className="material-symbols-outlined">edit</span>
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="drawer-btn-delete"
+                  onClick={() => remove(selectedApp)}
+                >
+                  <span className="material-symbols-outlined">delete</span>
+                  Delete
+                </button>
+              </div>
+            </aside>
+          )}
         </div>
       )}
 

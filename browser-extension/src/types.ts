@@ -32,6 +32,7 @@ export interface CapturePayload {
   url: string;
   description?: string | null;
   employment_type?: string | null;
+  captured_at?: string;
 }
 
 export interface ExtensionSettings {

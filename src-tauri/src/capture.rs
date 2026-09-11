@@ -24,7 +24,9 @@ pub struct DetectedJob {
     pub url: String,
     pub description: Option<String>,
     pub employment_type: Option<String>,
+    #[serde(default)]
     pub captured_at: String,
+    #[serde(default)]
     pub tab_id: Option<i64>,
 }
 

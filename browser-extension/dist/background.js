@@ -1,6 +1,6 @@
 // browser-extension/src/background.ts
 var DEFAULT_SETTINGS = {
-  token: "",
+  token: "jt_default_local_token",
   autoCapture: true,
   serverUrl: "http://127.0.0.1:41724"
 };
@@ -25,7 +25,7 @@ async function checkDesktopConnection() {
     });
     if (res.ok) {
       const data = await res.json();
-      isConnected = data.status === "ok";
+      isConnected = data.status === "ok" || data.status === "online" || data.online === true;
       return isConnected;
     }
   } catch {
@@ -46,15 +46,16 @@ async function sendJobToDesktop(job) {
       job_id: job.job_id,
       url: job.url,
       description: job.description,
-      employment_type: job.employment_type
+      employment_type: job.employment_type,
+      captured_at: (/* @__PURE__ */ new Date()).toISOString()
     };
+    const token = settings.token || "jt_default_local_token";
     const headers = {
       "Content-Type": "application/json",
-      Accept: "application/json"
+      Accept: "application/json",
+      "Authorization": `Bearer ${token}`,
+      "X-JobTracker-Token": token
     };
-    if (settings.token) {
-      headers["Authorization"] = `Bearer ${settings.token}`;
-    }
     const res = await fetch(`${settings.serverUrl}/api/capture`, {
       method: "POST",
       headers,

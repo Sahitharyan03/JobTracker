@@ -1,7 +1,7 @@
 import { CapturePayload, DetectedJob, ExtensionSettings } from "./types";
 
 const DEFAULT_SETTINGS: ExtensionSettings = {
-  token: "",
+  token: "jt_default_local_token",
   autoCapture: true,
   serverUrl: "http://127.0.0.1:41724",
 };
@@ -29,7 +29,8 @@ async function checkDesktopConnection(): Promise<boolean> {
     });
     if (res.ok) {
       const data = await res.json();
-      isConnected = data.status === "ok";
+      // Accepts "ok", "online", or online boolean for broad compatibility
+      isConnected = data.status === "ok" || data.status === "online" || data.online === true;
       return isConnected;
     }
   } catch {
@@ -53,16 +54,16 @@ async function sendJobToDesktop(job: DetectedJob): Promise<{ success: boolean; e
       url: job.url,
       description: job.description,
       employment_type: job.employment_type,
+      captured_at: new Date().toISOString(),
     };
 
+    const token = settings.token || "jt_default_local_token";
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       Accept: "application/json",
+      "Authorization": `Bearer ${token}`,
+      "X-JobTracker-Token": token,
     };
-
-    if (settings.token) {
-      headers["Authorization"] = `Bearer ${settings.token}`;
-    }
 
     const res = await fetch(`${settings.serverUrl}/api/capture`, {
       method: "POST",
