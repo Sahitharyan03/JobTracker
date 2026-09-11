@@ -1,34 +1,649 @@
 /*
- * Bento Analytics Dashboard Styling
- * Extracted from stitch_job_application_tracker_dashboard/code.html
+ * Insights (Analytics Bento Dashboard) — dark-mode aware via CSS variables
+ * All hardcoded slate/white/light colours replaced with var(--*)
  */
 
 .bento-view-root {
-  min-height: 100%;
-  width: 100%;
-  background: radial-gradient(circle at 50% 0%, #f4f6ff 0%, #faf8ff 100%);
-  color: #1e293b;
+  flex: 1;
+  background: var(--bg);
+  color: var(--text);
+  padding-bottom: 4rem;
 }
 
-.bento-card {
-  background-color: #ffffff;
-  border: 1px solid #eaedf6;
-  border-radius: 1.25rem;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+.bento-main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.75rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
-.bento-card:hover {
-  border-color: #d6ddf3;
-  box-shadow: 0 10px 30px -8px rgba(37, 47, 90, 0.06);
+/* ── Page Header ─────────────────────────────────────────────────────────── */
+.bento-page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
-.dashed-grid {
-  stroke: #e2e8f0;
-  stroke-dasharray: 4 4;
+.bento-page-title {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
 }
 
-/* Explicit 24-column template for perfect, non-collapsing 24-hour heatmap */
-.grid-cols-24 {
+.bento-page-sub {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0.2rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  background: var(--success-soft);
+  color: var(--success);
+  border: 1px solid color-mix(in srgb, var(--success) 30%, transparent);
+}
+
+/* ── Metric Cards ─────────────────────────────────────────────────────────── */
+.bento-metrics-grid {
   display: grid;
-  grid-template-columns: repeat(24, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.metric-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-bento);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 200ms, box-shadow 200ms;
+}
+
+.metric-card:hover {
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+}
+
+.metric-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-faint);
+}
+
+.metric-value {
+  font-family: var(--font-display);
+  font-size: 2.75rem;
+  font-weight: 900;
+  color: var(--text);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  margin: 0.25rem 0;
+}
+
+.metric-sub {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.metric-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 0.5rem 0 0.25rem;
+}
+
+.metric-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.metric-badge.success { background: var(--success-soft); color: var(--success); border: 1px solid color-mix(in srgb, var(--success) 25%, transparent); }
+.metric-badge.warning { background: var(--warning-soft); color: var(--warning); border: 1px solid color-mix(in srgb, var(--warning) 25%, transparent); }
+.metric-badge.danger  { background: var(--danger-soft); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 25%, transparent); }
+.metric-badge.neutral { background: var(--bg-inset); color: var(--text-secondary); border: 1px solid var(--border); }
+.metric-badge.accent  { background: var(--accent-soft); color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
+
+/* Progress bar */
+.metric-progress-track {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-inset);
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.metric-progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--accent);
+  transition: width 700ms ease;
+}
+
+/* Streak dots */
+.streak-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.streak-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+}
+
+.streak-dot.active {
+  background: var(--success);
+  border-color: transparent;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--success) 25%, transparent);
+}
+
+/* Hourly sparkline */
+.sparkline-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 2rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.spark-bar {
+  flex: 1;
+  border-radius: 2px 2px 0 0;
+  background: var(--accent-soft);
+  min-height: 2px;
+  transition: background 200ms;
+}
+
+.spark-bar.peak {
+  background: var(--accent);
+}
+
+/* ── Bento Grid ─────────────────────────────────────────────────────────── */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 1.5rem;
+}
+
+.bento-tile {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-bento);
+  padding: 1.5rem;
+  transition: border-color 200ms, box-shadow 200ms;
+}
+
+.bento-tile:hover {
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+}
+
+.bento-tile.span-7 { grid-column: span 7; }
+.bento-tile.span-5 { grid-column: span 5; }
+.bento-tile.span-6 { grid-column: span 6; }
+.bento-tile.span-4 { grid-column: span 4; }
+.bento-tile.span-12 { grid-column: span 12; }
+
+@media (max-width: 1024px) {
+  .bento-tile.span-7,
+  .bento-tile.span-5,
+  .bento-tile.span-6,
+  .bento-tile.span-4 {
+    grid-column: span 12;
+  }
+}
+
+/* ── Tile sub-components ─────────────────────────────────────────────────── */
+.tile-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.tile-title {
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tile-sub {
+  font-size: 0.6875rem;
+  color: var(--text-faint);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.tile-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.375rem;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 140ms;
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+.tile-icon-btn:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+/* ── Heatmap ─────────────────────────────────────────────────────────────── */
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+
+.heatmap-day-header {
+  text-align: center;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--text-faint);
+  padding-bottom: 4px;
+}
+
+.heatmap-cell {
+  height: 2.25rem;
+  border-radius: 0.375rem;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-faint);
+  cursor: default;
+  transition: transform 120ms, background 120ms;
+}
+
+.heatmap-cell.empty {
+  background: transparent;
+  border-color: transparent;
+}
+
+.heatmap-cell.low   { background: color-mix(in srgb, var(--success) 20%, var(--bg-card)); color: var(--success); border-color: color-mix(in srgb, var(--success) 20%, transparent); }
+.heatmap-cell.mid   { background: color-mix(in srgb, var(--success) 45%, var(--bg-card)); color: white; border-color: transparent; }
+.heatmap-cell.high  { background: color-mix(in srgb, var(--success) 75%, var(--bg-card)); color: white; border-color: transparent; }
+.heatmap-cell.peak  { background: var(--success); color: white; border-color: transparent; box-shadow: 0 0 0 2px color-mix(in srgb, var(--success) 30%, transparent); }
+
+.heatmap-cell.low:hover,
+.heatmap-cell.mid:hover,
+.heatmap-cell.high:hover,
+.heatmap-cell.peak:hover {
+  transform: scale(1.08);
+}
+
+/* Heatmap legend */
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.6875rem;
+  color: var(--text-faint);
+  font-weight: 600;
+  margin-top: 0.75rem;
+  padding-top: 0.625rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.legend-swatches {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+/* ── Progress / Funnel bars ──────────────────────────────────────────────── */
+.funnel-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 0.875rem;
+}
+
+.funnel-label-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.funnel-label { color: var(--text); }
+.funnel-pct   { color: var(--accent); }
+
+.funnel-track {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-inset);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.funnel-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 700ms ease;
+}
+
+/* ── Portal Effectiveness Table ──────────────────────────────────────────── */
+.portal-table {
+  width: 100%;
+  font-size: 0.75rem;
+}
+
+.portal-table thead th {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+  padding: 0 0 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.portal-table tbody tr {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.portal-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.portal-table tbody td {
+  padding: 0.5rem 0;
+  vertical-align: middle;
+  color: var(--text);
+}
+
+.portal-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.25rem;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.5625rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.velocity-bar-wrap {
+  width: 100%;
+  height: 5px;
+  background: var(--bg-inset);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.velocity-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 9999px;
+}
+
+/* ── Forecast Alert Banner ───────────────────────────────────────────────── */
+.forecast-alert {
+  padding: 0.75rem 1rem;
+  background: var(--warning-soft);
+  border: 1px solid color-mix(in srgb, var(--warning) 30%, transparent);
+  border-radius: 0.625rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text);
+  margin-bottom: 1rem;
+}
+
+.forecast-alert-icon {
+  color: var(--warning);
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+/* ── US Map placeholder ──────────────────────────────────────────────────── */
+.geo-map-container {
+  width: 100%;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.625rem;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  min-height: 10rem;
+}
+
+/* ── Weekly Bar Chart ─────────────────────────────────────────────────────── */
+.weekly-chart-wrap {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.weekly-chart-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.weekly-chart-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text);
+}
+
+.weekly-chart-sub {
+  font-size: 0.6875rem;
+  color: var(--text-faint);
+  margin-top: 1px;
+}
+
+/* ── Timing Matrix ───────────────────────────────────────────────────────── */
+.timing-matrix {
+  font-size: 0.6875rem;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.timing-matrix th {
+  color: var(--text-faint);
+  font-weight: 600;
+  padding: 4px 6px;
+  text-align: center;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.timing-matrix td {
+  padding: 4px;
+  text-align: center;
+}
+
+.timing-cell {
+  width: 1.625rem;
+  height: 1.375rem;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.5rem;
+  font-weight: 700;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  color: transparent;
+  transition: transform 120ms;
+  cursor: default;
+}
+
+.timing-cell.hot {
+  background: color-mix(in srgb, var(--accent) 80%, var(--bg-card));
+  color: white;
+  border-color: transparent;
+}
+
+.timing-cell.warm {
+  background: color-mix(in srgb, var(--accent) 40%, var(--bg-card));
+  color: white;
+  border-color: transparent;
+}
+
+.timing-cell.cool {
+  background: color-mix(in srgb, var(--accent) 15%, var(--bg-card));
+  color: var(--text-faint);
+  border-color: transparent;
+}
+
+/* ── Geo filter pills ─────────────────────────────────────────────────────── */
+.geo-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.geo-filter-pill {
+  padding: 0.25rem 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: var(--bg-inset);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 140ms, color 140ms;
+  font-family: inherit;
+}
+
+.geo-filter-pill:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+.geo-filter-pill.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* ── Salary scatter ──────────────────────────────────────────────────────── */
+.salary-scatter-wrap {
+  width: 100%;
+  position: relative;
+}
+
+.salary-median-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.875rem;
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  margin-top: 0.75rem;
+}
+
+/* ── Nav / month controls ─────────────────────────────────────────────────── */
+.month-nav-btn {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.375rem;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 140ms;
+  font-family: inherit;
+}
+
+.month-nav-btn:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+.month-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text);
+  padding: 0 0.5rem;
+}
+
+/* ── dashed SVG grid lines ──────────────────────────────────────────────── */
+.dashed-grid {
+  stroke: var(--border-subtle);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+
+.dashed-grid-text {
+  fill: var(--text-faint);
+  font-size: 9px;
 }

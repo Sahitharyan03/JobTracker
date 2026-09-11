@@ -250,41 +250,41 @@ export default function Popup() {
   }, [handleSave]);
 
   return (
-    <div className="bg-slate-900/60 min-h-screen flex items-center justify-center p-2 sm:p-4 font-sans antialiased text-slate-800">
-      <main className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[94vh] overflow-hidden">
+    <div className="popup-window" style={{ background: "var(--bg)", color: "var(--text)" }}>
+      <main className="relative w-full h-full flex flex-col overflow-hidden" style={{ background: "var(--bg-elevated)", color: "var(--text)" }}>
         {/* BEGIN: ModalHeader */}
-        <header className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white sticky top-0 z-20" data-tauri-drag-region>
-          <div className="flex items-center space-x-3" data-tauri-drag-region>
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">
-              <span className="material-symbols-outlined text-[20px]">description</span>
+        <header className="popup-modal-header" data-tauri-drag-region>
+          <div className="modal-title-group" data-tauri-drag-region>
+            <div className="modal-header-icon">
+              <span className="material-symbols-outlined">description</span>
             </div>
-            <div>
-              <h1 className="text-lg font-bold text-slate-900 tracking-tight">New Application</h1>
-              <p className="text-xs text-slate-500 font-medium">Record job application details &amp; documents</p>
+            <div className="modal-header-titles">
+              <h1 className="modal-title">New Application</h1>
+              <p className="modal-subtitle">Record job application details &amp; documents</p>
             </div>
           </div>
           <button
-            className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+            className="modal-close-btn"
             type="button"
             onClick={() => api.closePopup()}
             aria-label="Close dialog"
           >
-            <span className="material-symbols-outlined text-[20px]">close</span>
+            <span className="material-symbols-outlined">close</span>
           </button>
         </header>
 
         {/* Non-blocking Detection Toast / Banner */}
         {detectionNotice && (
-          <div className={`px-5 py-2.5 text-xs font-semibold flex items-center justify-between border-b ${
+          <div className={`detection-banner ${
             detectionNotice.type === "full"
-              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+              ? "detection-full"
               : detectionNotice.type === "partial"
-              ? "bg-indigo-50 text-indigo-800 border-indigo-200"
-              : "bg-amber-50 text-amber-800 border-amber-200"
+              ? "detection-partial"
+              : "detection-none"
           }`}>
             <span>{detectionNotice.message}</span>
             <button
-              className="text-slate-400 hover:text-slate-600 ml-2 cursor-pointer"
+              className="banner-dismiss"
               onClick={() => setDetectionNotice(null)}
             >
               ×
@@ -294,36 +294,34 @@ export default function Popup() {
 
         {/* Duplicate Warning Banner */}
         {duplicateWarning && (
-          <div className="px-5 py-2.5 bg-amber-50 text-amber-900 border-b border-amber-200 text-xs font-medium flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-amber-600 text-[18px]">warning</span>
-              <span>
-                {duplicateWarning.reason ||
-                  `Possible duplicate: Application already exists (${
-                    duplicateWarning.existing_id ? `ID #${duplicateWarning.existing_id}` : "earlier"
-                  }).`}
-              </span>
-            </div>
-            <button className="text-amber-500 hover:text-amber-800 cursor-pointer" onClick={() => setDuplicateWarning(null)}>
+          <div className="duplicate-warning-banner">
+            <span className="material-symbols-outlined warn-icon">warning</span>
+            <span className="warn-text">
+              {duplicateWarning.reason ||
+                `Possible duplicate: Application already exists (${
+                  duplicateWarning.existing_id ? `ID #${duplicateWarning.existing_id}` : "earlier"
+                }).`}
+            </span>
+            <button className="banner-dismiss" onClick={() => setDuplicateWarning(null)}>
               ×
             </button>
           </div>
         )}
 
         {/* BEGIN: ProgressIndicator */}
-        <div className="px-6 pt-3 pb-2 bg-slate-50/60 border-b border-slate-100">
-          <div className="flex items-center justify-between text-[11px] font-medium text-slate-500 mb-1.5">
-            <span className="text-indigo-600 font-semibold">Stage: Ready to Draft</span>
-            <span>4 Sections</span>
+        <div className="popup-progress-guide">
+          <div className="progress-info">
+            <span className="progress-stage">Stage: Ready to Draft</span>
+            <span className="progress-count">4 Sections</span>
           </div>
-          <div className="w-full bg-slate-200 h-1 rounded-full overflow-hidden">
-            <div className="bg-indigo-600 h-1 w-1/3 rounded-full transition-all duration-300"></div>
+          <div className="progress-track">
+            <div className="progress-fill" style={{ width: "33%" }}></div>
           </div>
         </div>
 
         {/* BEGIN: FormContentScrollArea */}
         <form
-          className="flex-1 overflow-y-auto px-6 py-5 space-y-6"
+          className="popup-scroll-body"
           id="jobApplicationForm"
           onSubmit={(e) => {
             e.preventDefault();
@@ -331,19 +329,19 @@ export default function Popup() {
           }}
         >
           {/* SECTION 1: JOB DETAILS */}
-          <section className="space-y-4">
-            <div className="border-b border-slate-100 pb-2">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">Job Details</h2>
+          <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ borderBottom: "1px solid var(--border-subtle)", paddingBottom: 6 }}>
+              <h2 style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-faint)" }}>Job Details</h2>
             </div>
 
             {/* Company Name */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1" htmlFor="company-name">
-                Company <span className="text-rose-500">*</span>
+              <label htmlFor="company-name">
+                Company <span style={{ color: "var(--danger)" }}>*</span>
               </label>
               <input
-                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
                 id="company-name"
+                style={{ width: "100%" }}
                 placeholder="e.g. Acme Corp, Google"
                 required
                 type="text"
@@ -355,12 +353,12 @@ export default function Popup() {
 
             {/* Role Title */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1" htmlFor="role-title">
-                Role <span className="text-rose-500">*</span>
+              <label htmlFor="role-title">
+                Role <span style={{ color: "var(--danger)" }}>*</span>
               </label>
               <input
-                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
                 id="role-title"
+                style={{ width: "100%" }}
                 placeholder="e.g. Senior Frontend Engineer"
                 required
                 type="text"
@@ -370,14 +368,14 @@ export default function Popup() {
             </div>
 
             {/* Job ID & Portal Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1" htmlFor="job-id">
+                <label htmlFor="job-id">
                   Job ID
                 </label>
                 <input
-                  className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
                   id="job-id"
+                  style={{ width: "100%" }}
                   placeholder="e.g. REQ-9842"
                   type="text"
                   value={values.builtin.job_id || ""}
@@ -386,42 +384,37 @@ export default function Popup() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1" htmlFor="application-portal">
+                <label htmlFor="application-portal">
                   Portal
                 </label>
-                <div className="relative">
-                  <select
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none appearance-none"
-                    id="application-portal"
-                    value={values.builtin.portal || ""}
-                    onChange={(e) => updateBuiltin("portal", e.target.value)}
-                  >
-                    <option value="">— Select source portal —</option>
-                    <option value="LinkedIn">LinkedIn</option>
-                    <option value="Greenhouse">Greenhouse</option>
-                    <option value="Lever">Lever</option>
-                    <option value="Workday">Workday</option>
-                    <option value="Indeed">Indeed</option>
-                    <option value="jobrightai">Jobright AI</option>
-                    <option value="Company Website">Company Career Portal</option>
-                    <option value="Internal Referral">Internal Referral</option>
-                    <option value="Other">Other</option>
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
-                    <span className="material-symbols-outlined text-[18px]">unfold_more</span>
-                  </div>
-                </div>
+                <select
+                  id="application-portal"
+                  style={{ width: "100%" }}
+                  value={values.builtin.portal || ""}
+                  onChange={(e) => updateBuiltin("portal", e.target.value)}
+                >
+                  <option value="">— Select source portal —</option>
+                  <option value="LinkedIn">LinkedIn</option>
+                  <option value="Greenhouse">Greenhouse</option>
+                  <option value="Lever">Lever</option>
+                  <option value="Workday">Workday</option>
+                  <option value="Indeed">Indeed</option>
+                  <option value="jobrightai">Jobright AI</option>
+                  <option value="Company Website">Company Career Portal</option>
+                  <option value="Internal Referral">Internal Referral</option>
+                  <option value="Other">Other</option>
+                </select>
               </div>
             </div>
 
             {/* Location Field */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1" htmlFor="job-location">
+              <label htmlFor="job-location">
                 Location
               </label>
               <input
-                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
                 id="job-location"
+                style={{ width: "100%" }}
                 placeholder="e.g. San Francisco, CA (Remote)"
                 type="text"
                 value={values.builtin.location || ""}
@@ -431,82 +424,86 @@ export default function Popup() {
           </section>
 
           {/* SECTION 2: CONTACT & COMPENSATION */}
-          <section className="space-y-4 pt-2">
-            <div className="border-b border-slate-100 pb-2">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">Contact &amp; Compensation</h2>
+          <section style={{ display: "flex", flexDirection: "column", gap: 12, paddingTop: 4 }}>
+            <div style={{ borderBottom: "1px solid var(--border-subtle)", paddingBottom: 6 }}>
+              <h2 style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-faint)" }}>Contact &amp; Compensation</h2>
             </div>
 
             {/* Address Used Field */}
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-sm font-semibold text-slate-700" htmlFor="address-used">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                <label htmlFor="address-used">
                   Address Used
                 </label>
                 {savedAddresses.length > 0 && (
                   <select
-                    className="text-[11px] text-indigo-600 bg-transparent border-none p-0 outline-none cursor-pointer hover:underline"
+                    style={{ fontSize: "0.6875rem", color: "var(--accent)", background: "transparent", border: "none", padding: 0, outline: "none", cursor: "pointer" }}
                     onChange={(e) => {
                       if (e.target.value) updateBuiltin("address_used", e.target.value);
                     }}
-                    value=""
+                    defaultValue=""
                   >
-                    <option value="">Auto-fill from saved...</option>
-                    {savedAddresses.map((sa) => (
-                      <option key={sa.id} value={sa.value}>{sa.label}</option>
+                    <option value="" disabled>Saved addresses...</option>
+                    {savedAddresses.map((addr) => (
+                      <option key={addr.id} value={addr.value}>
+                        {addr.label}: {addr.value.slice(0, 32)}...
+                      </option>
                     ))}
                   </select>
                 )}
               </div>
               <input
-                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
                 id="address-used"
-                placeholder="e.g. Current primary residence or city"
+                style={{ width: "100%" }}
+                placeholder="e.g. 1428 Elmwood Ave, Apt 4B, San Francisco, CA"
                 type="text"
                 value={values.builtin.address_used || ""}
                 onChange={(e) => updateBuiltin("address_used", e.target.value)}
               />
             </div>
 
-            {/* Phone & Salary Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Phone & Salary Grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-sm font-semibold text-slate-700" htmlFor="phone-number">
-                    Phone Number
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                  <label htmlFor="contact-phone">
+                    Phone Used
                   </label>
                   {savedPhones.length > 0 && (
                     <select
-                      className="text-[11px] text-indigo-600 bg-transparent border-none p-0 outline-none cursor-pointer hover:underline"
+                      style={{ fontSize: "0.6875rem", color: "var(--accent)", background: "transparent", border: "none", padding: 0, outline: "none", cursor: "pointer" }}
                       onChange={(e) => {
                         if (e.target.value) updateBuiltin("phone", e.target.value);
                       }}
-                      value=""
+                      defaultValue=""
                     >
-                      <option value="">Auto-fill...</option>
-                      {savedPhones.map((sp) => (
-                        <option key={sp.id} value={sp.value}>{sp.label}</option>
+                      <option value="" disabled>Saved phones...</option>
+                      {savedPhones.map((ph) => (
+                        <option key={ph.id} value={ph.value}>
+                          {ph.label}: {ph.value}
+                        </option>
                       ))}
                     </select>
                   )}
                 </div>
                 <input
-                  className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
-                  id="phone-number"
-                  placeholder="+1 (555) 000-0000"
-                  type="tel"
+                  id="contact-phone"
+                  style={{ width: "100%" }}
+                  placeholder="e.g. +1 (555) 234-5678"
+                  type="text"
                   value={values.builtin.phone || ""}
                   onChange={(e) => updateBuiltin("phone", e.target.value)}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1" htmlFor="salary-expectation">
-                  Salary Expectation
+                <label htmlFor="target-salary">
+                  Target Salary
                 </label>
                 <input
-                  className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
-                  id="salary-expectation"
-                  placeholder="e.g. $160,000 - $180,000"
+                  id="target-salary"
+                  style={{ width: "100%" }}
+                  placeholder="e.g. $145,000 / yr"
                   type="text"
                   value={values.builtin.salary_expectation || ""}
                   onChange={(e) => updateBuiltin("salary_expectation", e.target.value)}
@@ -515,59 +512,50 @@ export default function Popup() {
             </div>
           </section>
 
-          {/* SECTION 3: APPLICATION NOTES */}
-          <section className="space-y-4 pt-2">
-            <div className="border-b border-slate-100 pb-2">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">Application Notes</h2>
+          {/* SECTION 3: NOTES */}
+          <section style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 4 }}>
+            <div style={{ borderBottom: "1px solid var(--border-subtle)", paddingBottom: 6 }}>
+              <h2 style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-faint)" }}>Notes &amp; Context</h2>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1" htmlFor="application-notes">
-                Notes
-              </label>
               <textarea
-                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none resize-y"
-                id="application-notes"
-                placeholder="Add follow-up reminders, referral contacts, interview timelines, or key questions..."
-                rows={3}
+                style={{ width: "100%", minHeight: 70 }}
+                placeholder="Referrals, recruiter email, interview stages, or custom instructions..."
                 value={values.builtin.notes || ""}
                 onChange={(e) => updateBuiltin("notes", e.target.value)}
-              ></textarea>
+              />
             </div>
           </section>
 
           {/* SECTION 4: DOCUMENTS & ATTACHMENTS */}
-          <section className="space-y-4 pt-2 pb-4">
-            <div className="border-b border-slate-100 pb-2 mb-3">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Documents &amp; Attachments</h2>
+          <section style={{ display: "flex", flexDirection: "column", gap: 12, paddingTop: 4 }}>
+            <div style={{ borderBottom: "1px solid var(--border-subtle)", paddingBottom: 6 }}>
+              <h2 style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-faint)" }}>Documents &amp; Attachments</h2>
             </div>
 
             {/* Resume Attachment Card */}
-            <div className="border border-slate-200 rounded-xl p-4 mb-4 bg-white transition-all shadow-xs">
-              <header className="flex items-center justify-between mb-3 cursor-pointer group select-none">
+            <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.875rem", background: "var(--bg-inset)" }}>
+              <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, userSelect: "none" }}>
                 <div
-                  className="flex items-center space-x-2 text-slate-800"
+                  style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}
                   onClick={() => setResumeExpanded(!resumeExpanded)}
                 >
-                  <span className={`material-symbols-outlined text-slate-400 group-hover:text-slate-600 transition-transform ${resumeExpanded ? "" : "-rotate-90"}`}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: "var(--text-faint)", transition: "transform 140ms", transform: resumeExpanded ? "none" : "rotate(-90deg)" }}>
                     expand_more
                   </span>
-                  <h3 className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">Resume</h3>
+                  <h3 style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text)" }}>Resume</h3>
                 </div>
                 {/* LaTeX / PDF Toggle Segment */}
-                <div className="flex items-center bg-slate-100 p-0.5 rounded-lg text-xs border border-slate-200">
+                <div style={{ display: "flex", alignItems: "center", background: "var(--bg-elevated)", padding: 2, borderRadius: "0.375rem", border: "1px solid var(--border)" }}>
                   <button
-                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                      resumeFormat === "tex" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
-                    }`}
+                    style={{ padding: "2px 8px", fontSize: "0.6875rem", fontWeight: 600, borderRadius: "0.25rem", background: resumeFormat === "tex" ? "var(--primary)" : "transparent", color: resumeFormat === "tex" ? "var(--on-primary)" : "var(--text-secondary)" }}
                     type="button"
                     onClick={() => setResumeFormat("tex")}
                   >
                     .tex
                   </button>
                   <button
-                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                      resumeFormat === "pdf" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
-                    }`}
+                    style={{ padding: "2px 8px", fontSize: "0.6875rem", fontWeight: 600, borderRadius: "0.25rem", background: resumeFormat === "pdf" ? "var(--primary)" : "transparent", color: resumeFormat === "pdf" ? "var(--on-primary)" : "var(--text-secondary)" }}
                     type="button"
                     onClick={() => setResumeFormat("pdf")}
                   >
@@ -580,7 +568,7 @@ export default function Popup() {
                 <div>
                   {resumeFormat === "tex" ? (
                     <textarea
-                      className="w-full font-mono text-xs rounded-lg border border-slate-200 bg-slate-50/50 p-3 text-slate-700 placeholder:text-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all outline-none resize-y"
+                      style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "0.75rem", minHeight: 80 }}
                       placeholder="Paste LaTeX source here (e.g. \documentclass{article}...)"
                       rows={4}
                       value={resumeTex}
@@ -588,14 +576,14 @@ export default function Popup() {
                     />
                   ) : (
                     <div
-                      className="border-2 border-dashed border-slate-200 rounded-lg p-6 text-center hover:border-slate-300 transition-colors cursor-pointer"
+                      style={{ border: "2px dashed var(--border-strong)", borderRadius: "var(--radius)", padding: "1.25rem", textAlign: "center", cursor: "pointer", background: "var(--bg-elevated)" }}
                       onClick={handlePickResumePdf}
                     >
-                      <span className="material-symbols-outlined text-slate-400 text-[32px] mb-1">upload_file</span>
-                      <p className="text-xs text-slate-600 font-medium">Click to choose Resume.pdf or drag &amp; drop</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">PDF files up to 10MB</p>
+                      <span className="material-symbols-outlined" style={{ fontSize: 28, color: "var(--text-faint)", marginBottom: 4 }}>upload_file</span>
+                      <p style={{ fontSize: "0.75rem", color: "var(--text)", fontWeight: 500 }}>Click to choose Resume.pdf or drag &amp; drop</p>
+                      <p style={{ fontSize: "0.6875rem", color: "var(--text-faint)", marginTop: 2 }}>PDF files up to 10MB</p>
                       {resumePdfPath && (
-                        <p className="text-xs text-indigo-600 font-bold mt-2 truncate">Selected: {resumePdfPath}</p>
+                        <p style={{ fontSize: "0.75rem", color: "var(--accent)", fontWeight: 700, marginTop: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Selected: {resumePdfPath}</p>
                       )}
                     </div>
                   )}
@@ -604,32 +592,28 @@ export default function Popup() {
             </div>
 
             {/* Cover Letter Attachment Card */}
-            <div className="border border-slate-200 rounded-xl p-4 mb-4 bg-white transition-all shadow-xs">
-              <header className="flex items-center justify-between mb-3 cursor-pointer group select-none">
+            <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.875rem", background: "var(--bg-inset)" }}>
+              <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, userSelect: "none" }}>
                 <div
-                  className="flex items-center space-x-2 text-slate-800"
+                  style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}
                   onClick={() => setCoverExpanded(!coverExpanded)}
                 >
-                  <span className={`material-symbols-outlined text-slate-400 group-hover:text-slate-600 transition-transform ${coverExpanded ? "" : "-rotate-90"}`}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: "var(--text-faint)", transition: "transform 140ms", transform: coverExpanded ? "none" : "rotate(-90deg)" }}>
                     expand_more
                   </span>
-                  <h3 className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">Cover Letter</h3>
+                  <h3 style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text)" }}>Cover Letter</h3>
                 </div>
                 {/* LaTeX / PDF Toggle Segment */}
-                <div className="flex items-center bg-slate-100 p-0.5 rounded-lg text-xs border border-slate-200">
+                <div style={{ display: "flex", alignItems: "center", background: "var(--bg-elevated)", padding: 2, borderRadius: "0.375rem", border: "1px solid var(--border)" }}>
                   <button
-                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                      coverFormat === "tex" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
-                    }`}
+                    style={{ padding: "2px 8px", fontSize: "0.6875rem", fontWeight: 600, borderRadius: "0.25rem", background: coverFormat === "tex" ? "var(--primary)" : "transparent", color: coverFormat === "tex" ? "var(--on-primary)" : "var(--text-secondary)" }}
                     type="button"
                     onClick={() => setCoverFormat("tex")}
                   >
                     .tex
                   </button>
                   <button
-                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                      coverFormat === "pdf" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
-                    }`}
+                    style={{ padding: "2px 8px", fontSize: "0.6875rem", fontWeight: 600, borderRadius: "0.25rem", background: coverFormat === "pdf" ? "var(--primary)" : "transparent", color: coverFormat === "pdf" ? "var(--on-primary)" : "var(--text-secondary)" }}
                     type="button"
                     onClick={() => setCoverFormat("pdf")}
                   >
@@ -642,7 +626,7 @@ export default function Popup() {
                 <div>
                   {coverFormat === "tex" ? (
                     <textarea
-                      className="w-full font-mono text-xs rounded-lg border border-slate-200 bg-slate-50/50 p-3 text-slate-700 placeholder:text-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all outline-none resize-y"
+                      style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "0.75rem", minHeight: 80 }}
                       placeholder="Paste Cover Letter LaTeX source here"
                       rows={4}
                       value={coverTex}
@@ -650,14 +634,14 @@ export default function Popup() {
                     />
                   ) : (
                     <div
-                      className="border-2 border-dashed border-slate-200 rounded-lg p-6 text-center hover:border-slate-300 transition-colors cursor-pointer"
+                      style={{ border: "2px dashed var(--border-strong)", borderRadius: "var(--radius)", padding: "1.25rem", textAlign: "center", cursor: "pointer", background: "var(--bg-elevated)" }}
                       onClick={handlePickCoverPdf}
                     >
-                      <span className="material-symbols-outlined text-slate-400 text-[32px] mb-1">upload_file</span>
-                      <p className="text-xs text-slate-600 font-medium">Click to choose Cover_Letter.pdf or drag &amp; drop</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">PDF files up to 10MB</p>
+                      <span className="material-symbols-outlined" style={{ fontSize: 28, color: "var(--text-faint)", marginBottom: 4 }}>upload_file</span>
+                      <p style={{ fontSize: "0.75rem", color: "var(--text)", fontWeight: 500 }}>Click to choose Cover_Letter.pdf or drag &amp; drop</p>
+                      <p style={{ fontSize: "0.6875rem", color: "var(--text-faint)", marginTop: 2 }}>PDF files up to 10MB</p>
                       {coverPdfPath && (
-                        <p className="text-xs text-indigo-600 font-bold mt-2 truncate">Selected: {coverPdfPath}</p>
+                        <p style={{ fontSize: "0.75rem", color: "var(--accent)", fontWeight: 700, marginTop: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Selected: {coverPdfPath}</p>
                       )}
                     </div>
                   )}
@@ -666,38 +650,40 @@ export default function Popup() {
             </div>
           </section>
 
-          {error && <div className="p-3 rounded-lg bg-rose-50 text-rose-700 text-xs font-semibold">{error}</div>}
+          {error && <div className="popup-error-alert">{error}</div>}
         </form>
 
         {/* BEGIN: ModalStickyFooter */}
-        <footer className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-white/95 backdrop-blur-sm sticky bottom-0 z-20">
-          <div className="text-xs text-slate-500 select-none flex items-center space-x-1.5">
-            <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] font-mono text-slate-600">⌘/Ctrl + Enter</kbd>
-            <span>to save</span>
-            <span className="text-slate-300">•</span>
-            <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] font-mono text-slate-600">Esc</kbd>
-            <span>to close</span>
+        <footer className="popup-modal-footer">
+          <div className="footer-shortcut-hint">
+            <span className="kbd-pill">⌘/Ctrl + Enter</span>
+            <span>save</span>
+            <span className="sep">•</span>
+            <span className="kbd-pill">Esc</span>
+            <span>close</span>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="footer-actions">
             <button
-              className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              className="btn-modal-cancel"
               type="button"
               onClick={() => api.closePopup()}
             >
               Cancel
             </button>
             <button
-              className="inline-flex items-center justify-center px-6 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-semibold text-sm shadow-md shadow-indigo-600/20 hover:shadow-indigo-600/30 transition-all duration-150 cursor-pointer"
-              form="jobApplicationForm"
-              type="submit"
+              className="btn-modal-save"
+              type="button"
               disabled={saveState === "saving"}
+              onClick={handleSave}
             >
-              {saveState === "saved"
-                ? "Saved ✓"
-                : saveState === "saving"
-                ? "Saving…"
-                : "Save"}
+              {saveState === "saving" ? (
+                "Saving..."
+              ) : saveState === "saved" ? (
+                "Saved ✓"
+              ) : (
+                "Record Application"
+              )}
             </button>
           </div>
         </footer>

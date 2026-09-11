@@ -14,12 +14,40 @@ export function storedTheme(): Theme {
 }
 
 export function applyTheme(theme: Theme) {
+  const root = document.documentElement;
+  const body = document.body;
+  const isDark =
+    theme === "dark" ||
+    (theme === "system" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches);
+
   if (theme === "system") {
-    delete document.documentElement.dataset.theme;
+    delete root.dataset.theme;
     localStorage.removeItem(KEY);
   } else {
-    document.documentElement.dataset.theme = theme;
+    root.dataset.theme = theme;
+    root.setAttribute("data-theme", theme);
     localStorage.setItem(KEY, theme);
+  }
+
+  if (isDark) {
+    root.classList.add("dark");
+    root.classList.remove("light");
+    root.setAttribute("data-theme", "dark");
+    if (body) {
+      body.classList.add("dark");
+      body.classList.remove("light");
+      body.setAttribute("data-theme", "dark");
+    }
+  } else {
+    root.classList.remove("dark");
+    root.classList.add("light");
+    root.setAttribute("data-theme", "light");
+    if (body) {
+      body.classList.remove("dark");
+      body.classList.add("light");
+      body.setAttribute("data-theme", "light");
+    }
   }
 }
 
@@ -40,3 +68,4 @@ export function initTheme() {
     if (e.key === KEY || e.key === null) applyTheme(storedTheme());
   });
 }
+

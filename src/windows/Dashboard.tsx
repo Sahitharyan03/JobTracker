@@ -1,7 +1,6 @@
 /**
- * The main window shell based on stitch_applicant_tracking_kanban_dashboard
- * and stitch_job_application_tracker_dashboard reference designs.
- * Preserves all views, setup flow, data, and routes.
+ * The main window shell.
+ * All colours via CSS variables → dark mode works automatically via data-theme="dark".
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -34,26 +33,25 @@ export default function Dashboard() {
   if (!ready) return <SetupWizard onComplete={refresh} />;
 
   return (
-    <div className="bg-background text-slate-900 min-h-screen flex flex-col font-sans antialiased selection:bg-indigo-100 selection:text-indigo-600">
-      {/* Top Navigation matching requirement */}
-      <header className="w-full bg-white border-b border-slate-200 sticky top-0 z-30" data-tauri-drag-region>
-        <div className="max-w-[1720px] mx-auto px-6 h-16 flex items-center justify-between" data-tauri-drag-region>
-          <div className="flex items-center gap-8">
+    <div className="dashboard-shell">
+      {/* Top Navigation */}
+      <header className="dash-header" data-tauri-drag-region>
+        <div className="dash-header-inner" data-tauri-drag-region>
+          <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
             {/* Logo */}
             <div
-              className="flex items-center gap-2.5 group cursor-pointer"
+              className="dash-logo"
               onClick={() => setTab("insights")}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === "Enter" && setTab("insights")}
             >
-              <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xs shadow-sm">
-                JT
-              </div>
-              <span className="font-bold text-[17px] tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">
-                Job Tracker
-              </span>
+              <div className="dash-logo-badge">JT</div>
+              <span className="dash-logo-name">Job Tracker</span>
             </div>
 
-            {/* Navigation Tabs */}
-            <nav className="flex items-center gap-1.5 text-[14px]">
+            {/* Navigation Pills */}
+            <nav className="dash-nav">
               {(
                 [
                   ["insights", "Insights"],
@@ -66,11 +64,7 @@ export default function Dashboard() {
                 <button
                   key={key}
                   type="button"
-                  className={`px-3.5 py-1.5 rounded-full font-medium transition-colors cursor-pointer ${
-                    tab === key
-                      ? "bg-indigo-50 text-indigo-700 font-semibold"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                  }`}
+                  className={`dash-nav-pill${tab === key ? " active" : ""}`}
                   onClick={() => setTab(key)}
                 >
                   {label}
@@ -79,29 +73,27 @@ export default function Dashboard() {
             </nav>
           </div>
 
-          {/* Right Header Actions */}
-          <div className="flex items-center gap-4">
+          {/* Right Actions */}
+          <div className="dash-actions">
             <button
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-all shadow-sm active:scale-[0.98] cursor-pointer"
+              className="dash-new-btn"
               type="button"
               onClick={() => api.openPopup()}
-              title="Add a new application (Shortcut: Cmd/Ctrl+Shift+J)"
+              title="Add a new application"
             >
-              <span className="material-symbols-outlined text-[18px]">add</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add</span>
               <span>New Application</span>
             </button>
 
-            <span className="text-xs font-semibold tracking-wider text-slate-400 uppercase hidden sm:inline-block">
-              BY MJKR
-            </span>
+            <span className="dash-byline hidden sm:inline-block">BY MJKR</span>
 
             <ThemeToggle />
           </div>
         </div>
       </header>
 
-      {/* Main Container Viewport */}
-      <div className="flex-1 flex flex-col w-full">
+      {/* Main Viewport */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", width: "100%" }}>
         {tab === "insights" && <Insights />}
         {tab === "applications" && (
           <Applications onNewApplication={() => api.openPopup()} />

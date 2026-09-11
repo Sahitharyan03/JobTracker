@@ -3,7 +3,12 @@
  * Aligned with modern Stitch design system (Inter, Plus Jakarta Sans, Indigo-600).
  */
 
-:root {
+:root,
+:root[data-theme="light"],
+html.light,
+html[data-theme="light"],
+body.light,
+body[data-theme="light"] {
   --bg: #f8faff;
   --bg-elevated: #ffffff;
   --bg-inset: #f1f5f9;
@@ -55,7 +60,9 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-theme="light"]),
+  html:not(.light),
+  body:not(.light) {
     --bg: #0b1329;
     --bg-elevated: #131d38;
     --bg-inset: #080d1e;
@@ -96,7 +103,12 @@
   }
 }
 
-:root[data-theme="dark"] {
+:root[data-theme="dark"],
+html.dark,
+html[data-theme="dark"],
+body.dark,
+body[data-theme="dark"],
+[data-theme="dark"] {
   --bg: #0b1329;
   --bg-elevated: #131d38;
   --bg-inset: #080d1e;
@@ -135,6 +147,12 @@
   --shadow-lg: 0 12px 36px rgba(0, 0, 0, 0.55);
   --shadow-bento: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
+
+option {
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
 
 * {
   box-sizing: border-box;

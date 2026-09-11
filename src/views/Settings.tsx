@@ -91,32 +91,29 @@ export default function Settings() {
 
   const loadReusable = () => {
     api.listReusableValues("address").then((addrs) => {
-      if (addrs.length === 0) {
-        setSavedAddresses([
-          { id: 1, category: "address", label: "Home", value: "1428 Elmwood Ave, Apt 4B, San Francisco, CA 94107", is_default: true },
-          { id: 2, category: "address", label: "Parents / Permanent", value: "724 Meadow Lane, Austin, TX 78701", is_default: false },
-          { id: 3, category: "address", label: "Work / Relocation", value: "901 Cherry Ave, San Bruno, CA 94066", is_default: false },
-        ]);
-      } else {
-        setSavedAddresses(addrs);
-      }
+      setSavedAddresses(addrs);
     }).catch(() => {});
 
     api.listReusableValues("phone").then((phones) => {
-      if (phones.length === 0) {
-        setSavedPhones([
-          { id: 1, category: "phone", label: "Primary / Mobile", value: "+1 (555) 234-5678", is_default: true },
-          { id: 2, category: "phone", label: "Secondary / Work", value: "+1 (555) 987-6543", is_default: false },
-        ]);
-      } else {
-        setSavedPhones(phones);
-      }
+      setSavedPhones(phones);
     }).catch(() => {});
   };
 
   useEffect(() => {
-    api.listFields().then(setFields).catch(() => {});
-    api.getSetupState().then((s) => setDataDir(s.data_dir ?? "/Users/sahit/Documents/Job Tracker")).catch(() => {});
+    api.listFields().then((list) => {
+      setFields(list);
+      const portalField = list.find((f) => f.key === "portal");
+      if (portalField?.options) {
+        try {
+          const parsed = JSON.parse(portalField.options);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setPortalTags(parsed);
+          }
+        } catch {}
+      }
+    }).catch(() => {});
+
+    api.getSetupState().then((s) => setDataDir(s.data_dir ?? "")).catch(() => {});
     api.texEngineAvailable().then(setTexAvailable).catch(() => {});
     api.getExtensionToken().then(setExtensionToken).catch(() => {});
     api.getOrExportExtensionDir().then(setExtensionDir).catch(() => {});
@@ -173,14 +170,21 @@ export default function Settings() {
 
   const saveFieldConfig = async () => {
     try {
-      await api.saveFields(
-        fields.map((f, i) => ({
+      const syncedFields = fields.map((f, i) => {
+        let options = f.options;
+        if (f.key === "portal" && portalTags.length > 0) {
+          options = JSON.stringify(portalTags);
+        }
+        return {
           ...f,
+          options,
           sort_order: i,
           key: f.builtin ? f.key : slugify(f.label),
-        })),
-      );
-      flash("✓ Form fields saved successfully!");
+        };
+      });
+      await api.saveFields(syncedFields);
+      setFields(syncedFields);
+      flash("✓ Form fields & portal presets saved successfully!");
     } catch (e) {
       flash(`Error saving fields: ${e}`);
     }
@@ -191,6 +195,12 @@ export default function Settings() {
     try {
       await api.saveFields(DEFAULT_FIELDS);
       setFields(DEFAULT_FIELDS);
+      const portalField = DEFAULT_FIELDS.find((f) => f.key === "portal");
+      if (portalField?.options) {
+        try {
+          setPortalTags(JSON.parse(portalField.options));
+        } catch {}
+      }
       flash("Reset to default fields.");
     } catch (e) {
       flash(String(e));
@@ -217,8 +227,10 @@ export default function Settings() {
 
   const applyHotkeys = async () => {
     try {
+      await api.setSetting("hotkey_add", hotkeyAdd);
+      await api.setSetting("hotkey_dashboard", hotkeyDash);
       await api.applyHotkeys(hotkeyAdd, hotkeyDash);
-      flash("✓ Hotkeys registered successfully!");
+      flash("✓ Hotkeys applied and saved successfully!");
     } catch (e) {
       flash(`Failed to register hotkeys: ${e}`);
     }
@@ -263,7 +275,35 @@ export default function Settings() {
       setNewAddrVal("");
       setShowAddAddr(false);
       loadReusable();
-      flash("Address saved.");
+      flash("✓ Address saved.");
+    } catch (e) {
+      flash(String(e));
+    }
+  };
+
+  const handleDeleteAddress = async (id: number | undefined | null) => {
+    if (id == null) return;
+    try {
+      await api.deleteReusableValue(id);
+      loadReusable();
+      flash("Address removed.");
+    } catch (e) {
+      flash(String(e));
+    }
+  };
+
+  const handleSetDefaultAddress = async (addr: ReusableValue) => {
+    if (addr.id == null) return;
+    try {
+      await api.saveReusableValue({
+        id: addr.id,
+        category: "address",
+        label: addr.label,
+        value: addr.value,
+        is_default: true,
+      });
+      loadReusable();
+      flash(`✓ Default address set to ${addr.label}`);
     } catch (e) {
       flash(String(e));
     }
@@ -282,380 +322,335 @@ export default function Settings() {
       setNewPhoneVal("");
       setShowAddPhone(false);
       loadReusable();
-      flash("Phone number saved.");
+      flash("✓ Phone number saved.");
     } catch (e) {
       flash(String(e));
     }
   };
 
+  const handleDeletePhone = async (id: number | undefined | null) => {
+    if (id == null) return;
+    try {
+      await api.deleteReusableValue(id);
+      loadReusable();
+      flash("Phone number removed.");
+    } catch (e) {
+      flash(String(e));
+    }
+  };
+
+  const handleSetDefaultPhone = async (ph: ReusableValue) => {
+    if (ph.id == null) return;
+    try {
+      await api.saveReusableValue({
+        id: ph.id,
+        category: "phone",
+        label: ph.label,
+        value: ph.value,
+        is_default: true,
+      });
+      loadReusable();
+      flash(`✓ Default phone set to ${ph.label}`);
+    } catch (e) {
+      flash(String(e));
+    }
+  };
+
+  const handleRegenerateToken = async () => {
+    try {
+      const newToken = await api.generateNewExtensionToken();
+      setExtensionToken(newToken);
+      flash("✓ New companion token generated.");
+    } catch (e) {
+      flash(String(e));
+    }
+  };
+
+
   return (
-    <div className="w-full min-h-screen bg-surface font-sans text-slate-800 pb-16">
-      <div className="w-full max-w-5xl mx-auto px-6 py-8 flex flex-col gap-6">
+    <div className="settings-root">
+      <div className="settings-inner">
         {notice && (
-          <div className="px-4 py-2 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-lg border border-indigo-100 flex items-center justify-between">
+          <div className="settings-notice">
             <span>{notice}</span>
-            <button className="text-indigo-400 hover:text-indigo-600" onClick={() => setNotice("")}>×</button>
+            <button style={{ background: "transparent", border: "none", cursor: "pointer", color: "inherit", fontSize: "1rem" }} onClick={() => setNotice("")}>×</button>
           </div>
         )}
 
-        {/* Top Section Header Context */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-1.5 text-slate-400 font-semibold text-xs uppercase tracking-wider mb-1">
+        {/* Page Header */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.75rem", flexWrap: "wrap" }}>
+          <div className="settings-page-header">
+            <div className="settings-page-eyebrow">
               <span>Configuration</span>
-              <span>•</span>
-              <span className="text-indigo-600 font-mono">v2.4.0</span>
+              <span>·</span>
+              <span className="version">v2.4.0</span>
             </div>
-            <h1 className="font-display text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-              Form &amp; Workflow Preferences
-            </h1>
+            <h1 className="settings-page-title">Form &amp; Workflow Preferences</h1>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition-colors cursor-pointer"
-              type="button"
-              onClick={() => api.openPopup()}
-            >
-              <span className="material-symbols-outlined text-[17px]">visibility</span>
-              <span>Preview Add-Entry Modal</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+            <button className="settings-btn" type="button" onClick={() => api.openPopup()}>
+              <span className="material-symbols-outlined" style={{ fontSize: 17 }}>visibility</span>
+              Preview Add-Entry Modal
             </button>
-            <button
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 text-xs font-semibold transition-colors cursor-pointer"
-              type="button"
-              onClick={exportSchema}
-            >
-              <span className="material-symbols-outlined text-[17px]">file_download</span>
-              <span>Export Schema</span>
+            <button className="settings-btn" type="button" onClick={exportSchema}>
+              <span className="material-symbols-outlined" style={{ fontSize: 17 }}>file_download</span>
+              Export Schema
             </button>
           </div>
         </div>
 
         {/* CARD 1: FORM FIELDS BUILDER */}
-        <section className="bg-white rounded-xl shadow-[0_1px_3px_0_rgba(11,28,48,0.06)] border border-slate-200 p-6 flex flex-col gap-4">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-1">
-            <div className="max-w-2xl">
-              <div className="flex items-center gap-2">
-                <h2 className="font-display font-bold text-lg text-slate-900">Form Fields</h2>
-                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono text-xs">
-                  {fields.length} fields configured
-                </span>
+        <section className="settings-card">
+          <div className="settings-card-header">
+            <div>
+              <div className="settings-card-title">
+                Form Fields
+                <span className="settings-badge" style={{ fontFamily: "var(--font-mono)", fontSize: "0.6875rem" }}>{fields.length} fields</span>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                These are the questions the add-entry popup asks. Hide or remove a field and its already-saved data stays in the database and in exports.
-              </p>
+              <div className="settings-card-subtitle">
+                These are the questions the add-entry popup asks. Hidden fields stay in the database and exports.
+              </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                className="flex items-center gap-1 px-3.5 py-1.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition-colors cursor-pointer"
-                type="button"
-                onClick={addField}
-              >
-                <span className="material-symbols-outlined text-[17px]">add</span>
-                <span>Add Custom Field</span>
-              </button>
-            </div>
+            <button className="settings-btn accent-soft" type="button" onClick={addField}>
+              <span className="material-symbols-outlined" style={{ fontSize: 17 }}>add</span>
+              Add Custom Field
+            </button>
           </div>
 
-          {/* Fields List Track */}
-          <div className="flex flex-col gap-2">
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
             {fields.map((field, i) => {
               const isPortal = field.key === "portal";
               const isAddress = field.key === "address_used" || field.key === "address";
               const isPhone = field.key === "phone" || field.key === "phone_number";
 
               return (
-                <div key={field.key} className="flex flex-col bg-slate-50/80 rounded-xl border border-slate-200/80 overflow-hidden">
-                  <div className="group flex items-center gap-3 p-2 bg-slate-50/70 hover:bg-slate-100/60 rounded-xl transition-all">
-                    {/* Reorder Up/Down */}
-                    <div className="flex flex-col items-center justify-center text-slate-400 hover:text-slate-800 select-none px-1">
+                <div key={field.key} className="settings-field-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 0, padding: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 0, color: "var(--text-faint)", userSelect: "none" }}>
                       <button
-                        className="hover:text-indigo-600 transition-colors cursor-pointer leading-none disabled:opacity-20"
-                        title="Move Up"
-                        type="button"
-                        disabled={i === 0}
-                        onClick={() => move(i, -1)}
+                        style={{ background: "transparent", border: "none", cursor: i === 0 ? "not-allowed" : "pointer", color: "inherit", opacity: i === 0 ? 0.3 : 1, padding: 0, lineHeight: 1 }}
+                        title="Move Up" type="button" disabled={i === 0} onClick={() => move(i, -1)}
                       >
-                        <span className="material-symbols-outlined text-[15px]">keyboard_arrow_up</span>
+                        <span className="material-symbols-outlined" style={{ fontSize: 15 }}>keyboard_arrow_up</span>
                       </button>
                       <button
-                        className="hover:text-indigo-600 transition-colors cursor-pointer leading-none disabled:opacity-20"
-                        title="Move Down"
-                        type="button"
-                        disabled={i === fields.length - 1}
-                        onClick={() => move(i, 1)}
+                        style={{ background: "transparent", border: "none", cursor: i === fields.length - 1 ? "not-allowed" : "pointer", color: "inherit", opacity: i === fields.length - 1 ? 0.3 : 1, padding: 0, lineHeight: 1 }}
+                        title="Move Down" type="button" disabled={i === fields.length - 1} onClick={() => move(i, 1)}
                       >
-                        <span className="material-symbols-outlined text-[15px]">keyboard_arrow_down</span>
+                        <span className="material-symbols-outlined" style={{ fontSize: 15 }}>keyboard_arrow_down</span>
                       </button>
                     </div>
 
-                    {/* Field Name Input */}
-                    <div className="flex-1 min-w-0">
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <input
-                        className="w-full bg-white text-slate-900 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 outline-none focus:border-indigo-500 transition-all"
+                        className="settings-input"
+                        style={{ width: "100%", fontWeight: 600 }}
                         type="text"
                         value={field.label}
                         onChange={(e) => updateField(i, { label: e.target.value })}
                       />
                     </div>
 
-                    {/* Type Select */}
-                    <div className="relative shrink-0">
-                      <select
-                        className="bg-white text-slate-800 text-xs font-medium pl-3 pr-7 py-1.5 rounded-lg border border-slate-200 outline-none cursor-pointer"
-                        value={field.field_type}
-                        disabled={field.builtin}
-                        onChange={(e) => updateField(i, { field_type: e.target.value as FieldType })}
-                      >
-                        {FIELD_TYPES.map((t) => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
-                    </div>
+                    <select
+                      className="settings-select"
+                      style={{ flexShrink: 0, cursor: field.builtin ? "not-allowed" : "pointer" }}
+                      value={field.field_type}
+                      disabled={field.builtin}
+                      onChange={(e) => updateField(i, { field_type: e.target.value as FieldType })}
+                    >
+                      {FIELD_TYPES.map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
 
-                    {/* Shown / Required Checkboxes */}
-                    <div className="flex items-center gap-4 shrink-0 px-2">
-                      <label className="flex items-center gap-1.5 text-slate-600 text-xs cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          className="rounded text-indigo-600 focus:ring-0 cursor-pointer"
-                          checked={field.visible}
-                          onChange={(e) => updateField(i, { visible: e.target.checked })}
-                        />
+                    <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexShrink: 0, padding: "0 0.5rem" }}>
+                      <label className="settings-check-label">
+                        <input type="checkbox" checked={field.visible} onChange={(e) => updateField(i, { visible: e.target.checked })} />
                         <span>shown</span>
                       </label>
-                      <label className="flex items-center gap-1.5 text-slate-600 text-xs cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          className="rounded text-indigo-600 focus:ring-0 cursor-pointer"
-                          checked={field.required}
-                          onChange={(e) => updateField(i, { required: e.target.checked })}
-                        />
+                      <label className="settings-check-label">
+                        <input type="checkbox" checked={field.required} onChange={(e) => updateField(i, { required: e.target.checked })} />
                         <span>required</span>
                       </label>
                     </div>
 
-                    {/* Tune Drawer Toggle Button */}
-                    <button
-                      className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${
-                        (isPortal && portalDrawerOpen) || (isAddress && addressDrawerOpen) || (isPhone && phoneDrawerOpen)
-                          ? "bg-indigo-600 text-white"
-                          : "text-slate-400 hover:text-slate-700 hover:bg-slate-200/70"
-                      }`}
-                      title="Field Settings"
-                      type="button"
-                      onClick={() => {
-                        if (isPortal) setPortalDrawerOpen(!portalDrawerOpen);
-                        else if (isAddress) setAddressDrawerOpen(!addressDrawerOpen);
-                        else if (isPhone) setPhoneDrawerOpen(!phoneDrawerOpen);
-                      }}
-                    >
-                      <span className="material-symbols-outlined text-[17px]">tune</span>
-                    </button>
+                    {(isPortal || isAddress || isPhone) && (
+                      <button
+                        className="drawer-icon-btn"
+                        style={(isPortal && portalDrawerOpen) || (isAddress && addressDrawerOpen) || (isPhone && phoneDrawerOpen) ? { background: "var(--primary)", color: "var(--on-primary)" } : {}}
+                        title="Field Settings"
+                        type="button"
+                        onClick={() => {
+                          if (isPortal) setPortalDrawerOpen(!portalDrawerOpen);
+                          else if (isAddress) setAddressDrawerOpen(!addressDrawerOpen);
+                          else if (isPhone) setPhoneDrawerOpen(!phoneDrawerOpen);
+                        }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 17 }}>tune</span>
+                      </button>
+                    )}
                   </div>
 
                   {/* PORTAL PRESET DRAWER */}
                   {isPortal && portalDrawerOpen && (
-                    <div className="p-4 bg-white mx-2 mb-2 rounded-lg border border-slate-200/80 flex flex-col gap-3">
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-1">
+                    <div style={{ padding: "1rem", background: "var(--bg-elevated)", margin: "0 0.5rem 0.5rem", borderRadius: "0.5rem", border: "1px solid var(--border-subtle)", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.5rem" }}>
                         <div>
-                          <span className="font-bold text-xs text-slate-900">Target Portal Preset Badges</span>
-                          <p className="text-[11px] text-slate-500">Auto-detected application tracking systems will pre-select these options.</p>
+                          <div style={{ fontWeight: 700, fontSize: "0.75rem", color: "var(--text)" }}>Target Portal Preset Badges</div>
+                          <div style={{ fontSize: "0.6875rem", color: "var(--text-secondary)", marginTop: 2 }}>Auto-detected ATS systems will pre-select these options.</div>
                         </div>
-                        <div className="flex items-center gap-1.5 text-xs text-slate-500 font-mono">
-                          <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>
-                          <span>Auto-detection active</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", color: "var(--text-faint)", fontFamily: "var(--font-mono)" }}>
+                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)", display: "inline-block" }} />
+                          Auto-detection active
                         </div>
                       </div>
-
-                      {/* Portal Pills */}
-                      <div className="flex flex-wrap items-center gap-1.5">
+                      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
                         {portalTags.map((tag) => (
-                          <div key={tag} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-md text-xs font-semibold text-slate-800">
-                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
-                            <span>{tag}</span>
-                            <button
-                              className="text-slate-400 hover:text-rose-600 ml-1 cursor-pointer"
-                              type="button"
-                              onClick={() => setPortalTags(portalTags.filter((t) => t !== tag))}
-                            >
-                              ×
-                            </button>
-                          </div>
+                          <span key={tag} className="settings-tag">
+                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor", display: "inline-block" }} />
+                            {tag}
+                            <button type="button" onClick={() => setPortalTags(portalTags.filter((t) => t !== tag))}>×</button>
+                          </span>
                         ))}
-
                         {showAddTag ? (
-                          <div className="inline-flex items-center gap-1">
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                             <input
-                              className="px-2 py-0.5 text-xs border border-indigo-300 rounded outline-none"
+                              className="settings-input"
+                              style={{ width: "8rem", padding: "0.25rem 0.5rem" }}
                               placeholder="Portal name..."
                               value={newTagInput}
                               onChange={(e) => setNewTagInput(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" && newTagInput.trim()) {
-                                  setPortalTags([...portalTags, newTagInput.trim()]);
-                                  setNewTagInput("");
-                                  setShowAddTag(false);
-                                }
-                              }}
+                              onKeyDown={(e) => { if (e.key === "Enter" && newTagInput.trim()) { setPortalTags([...portalTags, newTagInput.trim()]); setNewTagInput(""); setShowAddTag(false); } }}
                               autoFocus
                             />
-                            <button
-                              className="text-xs text-indigo-600 font-bold"
-                              onClick={() => {
-                                if (newTagInput.trim()) {
-                                  setPortalTags([...portalTags, newTagInput.trim()]);
-                                  setNewTagInput("");
-                                }
-                                setShowAddTag(false);
-                              }}
-                            >
-                              Add
-                            </button>
-                          </div>
+                            <button className="settings-btn primary" style={{ padding: "0.25rem 0.625rem" }} onClick={() => { if (newTagInput.trim()) { setPortalTags([...portalTags, newTagInput.trim()]); setNewTagInput(""); } setShowAddTag(false); }}>Add</button>
+                          </span>
                         ) : (
-                          <button
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-md text-xs font-semibold transition-colors cursor-pointer"
-                            type="button"
-                            onClick={() => setShowAddTag(true)}
-                          >
-                            <span className="material-symbols-outlined text-[14px]">add</span>
-                            <span>Add Portal Tag</span>
+                          <button className="settings-btn accent-soft" type="button" onClick={() => setShowAddTag(true)}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add</span>
+                            Add Portal Tag
                           </button>
                         )}
-                      </div>
-
-                      {/* Browser Scraping Rule */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 text-xs">
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[11px] font-semibold text-slate-500">Default Form Value</label>
-                          <input className="bg-white text-slate-800 text-xs p-1.5 border border-slate-200 rounded outline-none" type="text" defaultValue="Greenhouse" />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[11px] font-semibold text-slate-500">Browser Extension Scraping Selector</label>
-                          <input className="bg-white font-mono text-xs text-slate-800 p-1.5 border border-slate-200 rounded outline-none" type="text" defaultValue="meta[property='og:site_name'], [data-qa='ats-portal']" />
-                        </div>
                       </div>
                     </div>
                   )}
 
                   {/* ADDRESS BOOK DRAWER */}
                   {isAddress && addressDrawerOpen && (
-                    <div className="p-4 bg-white mx-2 mb-2 rounded-lg border border-slate-200/80 flex flex-col gap-3">
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-1">
+                    <div style={{ padding: "1rem", background: "var(--bg-elevated)", margin: "0 0.5rem 0.5rem", borderRadius: "0.5rem", border: "1px solid var(--border-subtle)", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.5rem" }}>
                         <div>
-                          <span className="font-bold text-xs text-slate-900">Saved Address Book &amp; Selector</span>
-                          <p className="text-[11px] text-slate-500">Manage saved physical and mailing addresses for rapid auto-fill during job applications.</p>
+                          <div style={{ fontWeight: 700, fontSize: "0.75rem", color: "var(--text)" }}>Saved Address Book</div>
+                          <div style={{ fontSize: "0.6875rem", color: "var(--text-secondary)", marginTop: 2 }}>Manage saved addresses for rapid auto-fill.</div>
                         </div>
-                        <button
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-md text-xs font-semibold transition-colors cursor-pointer"
-                          type="button"
-                          onClick={() => setShowAddAddr(true)}
-                        >
-                          <span className="material-symbols-outlined text-[14px]">add</span>
-                          <span>Add New Address</span>
+                        <button className="settings-btn accent-soft" type="button" onClick={() => setShowAddAddr(true)}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add</span>
+                          Add Address
                         </button>
                       </div>
-
                       {showAddAddr && (
-                        <div className="p-3 bg-indigo-50/60 rounded-lg border border-indigo-100 space-y-2">
-                          <input
-                            className="w-full text-xs p-1.5 bg-white border border-slate-200 rounded"
-                            placeholder="Address Label (e.g. Home, Relocation)"
-                            value={newAddrLabel}
-                            onChange={(e) => setNewAddrLabel(e.target.value)}
-                          />
-                          <input
-                            className="w-full text-xs p-1.5 bg-white border border-slate-200 rounded"
-                            placeholder="Full Address (e.g. 1428 Elmwood Ave, San Francisco, CA)"
-                            value={newAddrVal}
-                            onChange={(e) => setNewAddrVal(e.target.value)}
-                          />
-                          <div className="flex justify-end gap-2">
-                            <button className="text-xs px-2.5 py-1 text-slate-600" onClick={() => setShowAddAddr(false)}>Cancel</button>
-                            <button className="text-xs px-3 py-1 bg-indigo-600 text-white rounded font-semibold" onClick={handleAddAddress}>Save Address</button>
+                        <div className="settings-add-form">
+                          <input className="settings-input" style={{ width: "100%" }} placeholder="Label (e.g. Home, Relocation)" value={newAddrLabel} onChange={(e) => setNewAddrLabel(e.target.value)} />
+                          <input className="settings-input" style={{ width: "100%" }} placeholder="Full Address" value={newAddrVal} onChange={(e) => setNewAddrVal(e.target.value)} />
+                          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                            <button className="settings-btn" type="button" onClick={() => setShowAddAddr(false)}>Cancel</button>
+                            <button className="settings-btn primary" type="button" onClick={handleAddAddress}>Save Address</button>
                           </div>
                         </div>
                       )}
+                      {savedAddresses.length === 0 && (
+                        <div style={{ fontSize: "0.75rem", color: "var(--text-faint)", padding: "0.5rem 0" }}>
+                          No saved addresses yet. Click "Add Address" to store your home, permanent, or work addresses for quick auto-fill.
+                        </div>
+                      )}
+                      {savedAddresses.map((addr) => (
 
-                      <div className="grid grid-cols-1 gap-2">
-                        {savedAddresses.map((addr, idx) => (
-                          <div key={addr.id || idx} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200/80">
-                            <div className="flex items-start gap-2.5 min-w-0">
-                              <span className="material-symbols-outlined text-indigo-600 text-[18px] mt-0.5">
-                                {idx === 0 ? "radio_button_checked" : "radio_button_unchecked"}
-                              </span>
-                              <div className="flex flex-col min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-semibold text-xs text-slate-900">{addr.label}</span>
-                                  {idx === 0 && <span className="px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-700 text-[10px] font-bold">Default</span>}
-                                </div>
-                                <span className="text-[11px] text-slate-500 truncate mt-0.5">{addr.value}</span>
+                        <div key={addr.id} className="reusable-card">
+                          <div
+                            style={{ display: "flex", alignItems: "flex-start", gap: 10, minWidth: 0, flex: 1, cursor: "pointer" }}
+                            onClick={() => handleSetDefaultAddress(addr)}
+                            title="Click to make default address"
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 18, color: addr.is_default ? "var(--accent)" : "var(--text-faint)", marginTop: 2, flexShrink: 0 }}>
+                              {addr.is_default ? "radio_button_checked" : "radio_button_unchecked"}
+                            </span>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <span className="label">{addr.label}</span>
+                                {addr.is_default && <span className="settings-badge">Default</span>}
                               </div>
+                              <div className="value" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{addr.value}</div>
                             </div>
                           </div>
-                        ))}
-                      </div>
+                          <button
+                            className="drawer-icon-btn danger"
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleDeleteAddress(addr.id); }}
+                            title="Delete address"
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   )}
 
                   {/* PHONE NUMBERS DRAWER */}
                   {isPhone && phoneDrawerOpen && (
-                    <div className="p-4 bg-white mx-2 mb-2 rounded-lg border border-slate-200/80 flex flex-col gap-3">
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-1">
+                    <div style={{ padding: "1rem", background: "var(--bg-elevated)", margin: "0 0.5rem 0.5rem", borderRadius: "0.5rem", border: "1px solid var(--border-subtle)", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.5rem" }}>
                         <div>
-                          <span className="font-bold text-xs text-slate-900">Saved Phone Numbers &amp; Selector</span>
-                          <p className="text-[11px] text-slate-500">Manage saved phone numbers for rapid auto-fill during job applications.</p>
+                          <div style={{ fontWeight: 700, fontSize: "0.75rem", color: "var(--text)" }}>Saved Phone Numbers</div>
+                          <div style={{ fontSize: "0.6875rem", color: "var(--text-secondary)", marginTop: 2 }}>Manage saved phone numbers for rapid auto-fill.</div>
                         </div>
-                        <button
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-md text-xs font-semibold transition-colors cursor-pointer"
-                          type="button"
-                          onClick={() => setShowAddPhone(true)}
-                        >
-                          <span className="material-symbols-outlined text-[14px]">add</span>
-                          <span>Add Phone Number</span>
+                        <button className="settings-btn accent-soft" type="button" onClick={() => setShowAddPhone(true)}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add</span>
+                          Add Phone
                         </button>
                       </div>
-
                       {showAddPhone && (
-                        <div className="p-3 bg-indigo-50/60 rounded-lg border border-indigo-100 space-y-2">
-                          <input
-                            className="w-full text-xs p-1.5 bg-white border border-slate-200 rounded"
-                            placeholder="Phone Label (e.g. Mobile, Work)"
-                            value={newPhoneLabel}
-                            onChange={(e) => setNewPhoneLabel(e.target.value)}
-                          />
-                          <input
-                            className="w-full text-xs p-1.5 bg-white border border-slate-200 rounded"
-                            placeholder="Phone Number (e.g. +1 (555) 234-5678)"
-                            value={newPhoneVal}
-                            onChange={(e) => setNewPhoneVal(e.target.value)}
-                          />
-                          <div className="flex justify-end gap-2">
-                            <button className="text-xs px-2.5 py-1 text-slate-600" onClick={() => setShowAddPhone(false)}>Cancel</button>
-                            <button className="text-xs px-3 py-1 bg-indigo-600 text-white rounded font-semibold" onClick={handleAddPhone}>Save Phone</button>
+                        <div className="settings-add-form">
+                          <input className="settings-input" style={{ width: "100%" }} placeholder="Label (e.g. Mobile, Work)" value={newPhoneLabel} onChange={(e) => setNewPhoneLabel(e.target.value)} />
+                          <input className="settings-input" style={{ width: "100%" }} placeholder="Phone Number" value={newPhoneVal} onChange={(e) => setNewPhoneVal(e.target.value)} />
+                          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                            <button className="settings-btn" type="button" onClick={() => setShowAddPhone(false)}>Cancel</button>
+                            <button className="settings-btn primary" type="button" onClick={handleAddPhone}>Save Phone</button>
                           </div>
                         </div>
                       )}
-
-                      <div className="grid grid-cols-1 gap-2">
-                        {savedPhones.map((ph, idx) => (
-                          <div key={ph.id || idx} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200/80">
-                            <div className="flex items-start gap-2.5 min-w-0">
-                              <span className="material-symbols-outlined text-indigo-600 text-[18px] mt-0.5">
-                                {idx === 0 ? "radio_button_checked" : "radio_button_unchecked"}
-                              </span>
-                              <div className="flex flex-col min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-semibold text-xs text-slate-900">{ph.label}</span>
-                                  {idx === 0 && <span className="px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-700 text-[10px] font-bold">Default</span>}
-                                </div>
-                                <span className="text-[11px] text-slate-500 font-mono mt-0.5">{ph.value}</span>
+                      {savedPhones.length === 0 && (
+                        <div style={{ fontSize: "0.75rem", color: "var(--text-faint)", padding: "0.5rem 0" }}>
+                          No saved phone numbers yet. Click "Add Phone" to store your primary or secondary contact numbers.
+                        </div>
+                      )}
+                      {savedPhones.map((ph) => (
+                        <div key={ph.id} className="reusable-card">
+                          <div
+                            style={{ display: "flex", alignItems: "flex-start", gap: 10, minWidth: 0, flex: 1, cursor: "pointer" }}
+                            onClick={() => handleSetDefaultPhone(ph)}
+                            title="Click to make default phone"
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 18, color: ph.is_default ? "var(--accent)" : "var(--text-faint)", marginTop: 2, flexShrink: 0 }}>
+                              {ph.is_default ? "radio_button_checked" : "radio_button_unchecked"}
+                            </span>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <span className="label">{ph.label}</span>
+                                {ph.is_default && <span className="settings-badge">Default</span>}
                               </div>
+                              <div className="value" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-mono)" }}>{ph.value}</div>
                             </div>
                           </div>
-                        ))}
-                      </div>
+                          <button
+                            className="drawer-icon-btn danger"
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleDeletePhone(ph.id); }}
+                            title="Delete phone number"
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -663,222 +658,135 @@ export default function Settings() {
             })}
           </div>
 
-          {/* Action Footer */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-100">
-            <button
-              className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition-colors cursor-pointer"
-              type="button"
-              onClick={addField}
-            >
-              <span className="material-symbols-outlined text-[18px]">add</span>
-              <span>Add field</span>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", paddingTop: "0.75rem", borderTop: "1px solid var(--border-subtle)", flexWrap: "wrap" }}>
+            <button className="settings-btn" type="button" onClick={addField}>
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add</span>
+              Add field
             </button>
-            <div className="flex items-center gap-3">
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
               <button
-                className="text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
-                type="button"
-                onClick={resetDefaults}
+                style={{ background: "transparent", border: "none", fontSize: "0.75rem", fontWeight: 600, color: "var(--text-secondary)", cursor: "pointer", transition: "color 140ms" }}
+                type="button" onClick={resetDefaults}
+                onMouseOver={(e) => ((e.target as HTMLElement).style.color = "var(--text)")}
+                onMouseOut={(e) => ((e.target as HTMLElement).style.color = "var(--text-secondary)")}
               >
                 Reset to defaults
               </button>
-              <button
-                className="flex items-center gap-1.5 px-5 py-2 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition-all cursor-pointer shadow-sm"
-                type="button"
-                onClick={saveFieldConfig}
-              >
-                <span className="material-symbols-outlined text-[18px]">check</span>
-                <span>Save fields</span>
+              <button className="settings-btn primary" type="button" onClick={saveFieldConfig}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>check</span>
+                Save fields
               </button>
             </div>
           </div>
         </section>
 
         {/* CARD 2: GLOBAL HOTKEYS */}
-        <section className="bg-white rounded-xl shadow-[0_1px_3px_0_rgba(11,28,48,0.06)] border border-slate-200 p-6 flex flex-col gap-4">
-          <div>
-            <h2 className="font-display font-bold text-lg text-slate-900">Global Hotkeys</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Control quick capture and dashboard access system-wide via background listener daemon.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-            {/* Add application hotkey */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-800">Add application</span>
-              <HotkeyRecorder
-                value={hotkeyAdd}
-                onChange={setHotkeyAdd}
-              />
-            </div>
-            {/* Open dashboard hotkey */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold text-slate-800">Open dashboard</span>
-              <HotkeyRecorder
-                value={hotkeyDash}
-                onChange={setHotkeyDash}
-              />
+        <section className="settings-card">
+          <div className="settings-card-header">
+            <div>
+              <div className="settings-card-title">Global Hotkeys</div>
+              <div className="settings-card-subtitle">Control quick capture and dashboard access system-wide via background listener daemon.</div>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-100">
-            <span className="text-xs text-slate-500">Click a box, then press the key combo you want to use.</span>
-            <button
-              className="px-4 py-2 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition-all cursor-pointer shadow-xs"
-              type="button"
-              onClick={applyHotkeys}
-            >
-              Apply hotkeys
-            </button>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text)" }}>Add application</span>
+              <HotkeyRecorder value={hotkeyAdd} onChange={setHotkeyAdd} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text)" }}>Open dashboard</span>
+              <HotkeyRecorder value={hotkeyDash} onChange={setHotkeyDash} />
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", paddingTop: "0.625rem", borderTop: "1px solid var(--border-subtle)", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Click a box, then press the key combo you want to use.</span>
+            <button className="settings-btn primary" type="button" onClick={applyHotkeys}>Apply hotkeys</button>
           </div>
         </section>
 
         {/* CARD 3: DOCUMENTS & LATEX ENGINE */}
-        <section className="bg-white rounded-xl shadow-[0_1px_3px_0_rgba(11,28,48,0.06)] border border-slate-200 p-6 flex flex-col gap-4">
-          <div>
-            <h2 className="font-display font-bold text-lg text-slate-900">Documents</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Resume compiling preferences and export pipelines.</p>
+        <section className="settings-card">
+          <div className="settings-card-header">
+            <div>
+              <div className="settings-card-title">Documents</div>
+              <div className="settings-card-subtitle">Resume compiling preferences and export pipelines.</div>
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Mode toggle */}
-            <div className="flex flex-col gap-2">
-              <span className="text-xs font-bold text-slate-800">Default mode for new entries</span>
-              <div className="inline-flex p-1 bg-slate-100 rounded-xl w-fit border border-slate-200">
-                <button
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    docMode === "tex" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
-                  }`}
-                  type="button"
-                  onClick={() => saveDocMode("tex")}
-                >
-                  LaTeX source
-                </button>
-                <button
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    docMode === "pdf" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
-                  }`}
-                  type="button"
-                  onClick={() => saveDocMode("pdf")}
-                >
-                  PDF files
-                </button>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text)" }}>Default mode for new entries</span>
+              <div className="settings-radio-grid">
+                <div className={`settings-radio-option${docMode === "tex" ? " selected" : ""}`} onClick={() => saveDocMode("tex")}>
+                  <input type="radio" checked={docMode === "tex"} onChange={() => saveDocMode("tex")} style={{ position: "absolute", opacity: 0 }} />
+                  <span className="option-label">LaTeX source</span>
+                  <span className="option-sub">.tex files compiled with Tectonic</span>
+                </div>
+                <div className={`settings-radio-option${docMode === "pdf" ? " selected" : ""}`} onClick={() => saveDocMode("pdf")}>
+                  <input type="radio" checked={docMode === "pdf"} onChange={() => saveDocMode("pdf")} style={{ position: "absolute", opacity: 0 }} />
+                  <span className="option-label">PDF files</span>
+                  <span className="option-sub">Upload pre-built PDFs</span>
+                </div>
               </div>
             </div>
-
-            {/* Engine status */}
-            <div className="flex flex-col gap-2">
-              <span className="text-xs font-bold text-slate-800">LaTeX engine</span>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-xs font-semibold text-slate-800">
-                  <span className={`w-2 h-2 rounded-full ${texAvailable ? "bg-emerald-500" : "bg-amber-500"}`}></span>
-                  <span>
-                    {texAvailable
-                      ? "Tectonic found — .tex previews will compile"
-                      : "Tectonic not installed (fallback PDF viewer active)"}
-                  </span>
-                </div>
-                <button
-                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition cursor-pointer"
-                  type="button"
-                  onClick={() => {
-                    api.texEngineAvailable().then((ok) => {
-                      setTexAvailable(ok);
-                      flash(ok ? "Tectonic engine verified!" : "Tectonic engine not detected.");
-                    });
-                  }}
-                >
-                  Recheck
-                </button>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text)" }}>LaTeX engine</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: texAvailable ? "var(--success)" : "var(--warning)", display: "inline-block", flexShrink: 0 }} />
+                <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text)", flex: 1 }}>
+                  {texAvailable ? "Tectonic found — .tex previews will compile" : "Tectonic not installed (fallback PDF viewer active)"}
+                </span>
+                <button className="settings-btn" type="button" onClick={() => { api.texEngineAvailable().then((ok) => { setTexAvailable(ok); flash(ok ? "Tectonic verified!" : "Tectonic not detected."); }); }}>Recheck</button>
               </div>
             </div>
           </div>
         </section>
 
         {/* CARD 4: DATA & STORAGE */}
-        <section className="bg-white rounded-xl shadow-[0_1px_3px_0_rgba(11,28,48,0.06)] border border-slate-200 p-6 flex flex-col gap-4">
-          <div>
-            <h2 className="font-display font-bold text-lg text-slate-900">Data</h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Everything lives in this folder — database and documents. Back it up or move it freely; nothing ever leaves your machine.
-            </p>
-          </div>
-          <div className="w-full bg-slate-50 rounded-xl p-3.5 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="material-symbols-outlined text-indigo-600 text-[22px] shrink-0">folder</span>
-              <span className="font-mono text-xs text-slate-800 select-all truncate">{dataDir}</span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs font-semibold transition cursor-pointer shadow-2xs"
-                type="button"
-                onClick={openDataFolder}
-              >
-                Open in Finder
-              </button>
-              <button
-                className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs font-semibold transition cursor-pointer shadow-2xs"
-                type="button"
-                onClick={chooseDir}
-              >
-                Change
-              </button>
+        <section className="settings-card">
+          <div className="settings-card-header">
+            <div>
+              <div className="settings-card-title">Data</div>
+              <div className="settings-card-subtitle">Everything lives in this folder — back it up or move it freely. Nothing ever leaves your machine.</div>
             </div>
           </div>
-
-          {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 text-xs">
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-center justify-between">
-              <span className="text-slate-500 font-medium">SQLite Database Size</span>
-              <span className="font-mono font-bold text-slate-900">4.2 MB</span>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-center justify-between">
-              <span className="text-slate-500 font-medium">Compiled Artifacts</span>
-              <span className="font-mono font-bold text-slate-900">48 PDF files</span>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-center justify-between">
-              <span className="text-slate-500 font-medium">Last Snapshot Backup</span>
-              <span className="font-mono text-indigo-600 font-bold">Today, 09:14 AM</span>
-            </div>
+          <div className="settings-dir-row">
+            <span className="material-symbols-outlined" style={{ fontSize: 20, color: "var(--accent)", flexShrink: 0 }}>folder</span>
+            <span className="settings-dir-path" style={{ userSelect: "all" }}>{dataDir || "No directory selected"}</span>
+            <button className="settings-btn" type="button" onClick={openDataFolder}>Open in Finder</button>
+            <button className="settings-btn" type="button" onClick={chooseDir}>Change</button>
           </div>
         </section>
 
         {/* CARD 5: BROWSER COMPANION EXTENSION PAIRING */}
-        <section className="bg-white rounded-xl shadow-[0_1px_3px_0_rgba(11,28,48,0.06)] border border-slate-200 p-6 flex flex-col gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-display font-bold text-lg text-slate-900">Chrome Companion Extension</h2>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
-                Active &amp; Linked
-              </span>
+        <section className="settings-card">
+          <div className="settings-card-header">
+            <div>
+              <div className="settings-card-title">
+                Chrome Companion Extension
+                <span className="metric-badge success">Active &amp; Linked</span>
+              </div>
+              <div className="settings-card-subtitle">
+                Detects job postings on LinkedIn, Indeed, Greenhouse, Lever, and Jobright, auto-syncing to your local app.
+              </div>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              The companion extension detects job postings on LinkedIn, Indeed, Greenhouse, Lever, and Jobright, auto-syncing to your local JobTracker app.
-            </p>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Extension Directory</span>
-              <span className="font-mono text-[11px] text-slate-800 break-all block">{extensionDir}</span>
-              <button
-                className="mt-2 text-xs font-bold text-indigo-600 hover:underline cursor-pointer"
-                type="button"
-                onClick={() => openPath(extensionDir)}
-              >
-                Open Extension Folder
-              </button>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+            <div className="settings-token-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
+              <span style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-faint)" }}>Extension Directory</span>
+              <span className="settings-token-value" style={{ wordBreak: "break-all", whiteSpace: "normal" }}>{extensionDir || "browser-extension/"}</span>
+              <button className="settings-btn accent-soft" type="button" style={{ marginTop: 4 }} onClick={() => api.openExtensionFolder()}>Open Extension Folder</button>
             </div>
-
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Loopback Auth Token</span>
-              <span className="font-mono text-[11px] text-slate-800 block truncate">{extensionToken}</span>
-              <button
-                className="mt-2 text-xs font-bold text-indigo-600 hover:underline cursor-pointer"
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(extensionToken);
-                  setTokenCopied(true);
-                  setTimeout(() => setTokenCopied(false), 2500);
-                }}
-              >
-                {tokenCopied ? "Copied ✓" : "Copy Token"}
-              </button>
+            <div className="settings-token-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
+              <span style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-faint)" }}>Loopback Auth Token</span>
+              <span className="settings-token-value">{extensionToken || "Loading token..."}</span>
+              <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                <button className="settings-btn accent-soft" type="button" onClick={() => { navigator.clipboard.writeText(extensionToken); setTokenCopied(true); setTimeout(() => setTokenCopied(false), 2500); }}>
+                  {tokenCopied ? "Copied ✓" : "Copy Token"}
+                </button>
+                <button className="settings-btn" type="button" onClick={handleRegenerateToken} title="Generate new auth token">
+                  Regenerate
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -886,3 +794,4 @@ export default function Settings() {
     </div>
   );
 }
+
