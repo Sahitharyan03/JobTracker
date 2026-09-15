@@ -97,6 +97,52 @@ export const api = {
   openExtensionFolder: () => safeInvoke<string>("open_extension_folder"),
 
   // Documents
+  syncEmailStatus: async (payload: {
+    company: string;
+    status: Status | string;
+    notes?: string;
+    email_subject?: string;
+    sender?: string;
+    snippet?: string;
+    confidence?: number;
+    matched_at?: string;
+  }): Promise<{ status: string; updated: boolean; matched_company?: string; new_status?: string }> => {
+    if (isTauri()) {
+      try {
+        const res = await fetch("http://127.0.0.1:41724/api/status-update", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer jt_default_local_token",
+            "X-JobTracker-Token": "jt_default_local_token",
+          },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch {}
+    }
+
+    // Web / local storage fallback
+    const apps: Application[] = demoStore.applications;
+    const match = apps.find(
+      (a: Application) =>
+        a.company.toLowerCase().includes(payload.company.toLowerCase()) ||
+        payload.company.toLowerCase().includes(a.company.toLowerCase()),
+    );
+    if (match && match.id) {
+      await safeInvoke<void>("update_status", { id: match.id, status: payload.status });
+      return {
+        status: "ok",
+        updated: true,
+        matched_company: match.company,
+        new_status: payload.status,
+      };
+    }
+    return { status: "ok", updated: false, matched_company: payload.company };
+  },
+
   importPdf: (source: string, company: string, role: string, docType: string) =>
     safeInvoke<string>("import_pdf", { source, company, role, docType }),
   resolveDocumentPath: (relative: string) =>

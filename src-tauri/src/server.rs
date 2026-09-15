@@ -5,7 +5,9 @@
 //! prevent unauthorized local browser tabs or applications from forging data.
 
 use crate::capture::{self, DetectedJob, SharedCaptureState};
+use crate::db::Db;
 use chrono::Local;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -14,10 +16,29 @@ use std::thread;
 
 pub const DEFAULT_SERVER_PORT: u16 = 41724;
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StatusUpdatePayload {
+    pub company: String,
+    pub status: String,
+    #[serde(default)]
+    pub notes: Option<String>,
+    #[serde(default)]
+    pub email_subject: Option<String>,
+    #[serde(default)]
+    pub sender: Option<String>,
+    #[serde(default)]
+    pub snippet: Option<String>,
+    #[serde(default)]
+    pub confidence: Option<f64>,
+    #[serde(default)]
+    pub matched_at: Option<String>,
+}
+
 pub struct ServerConfig {
     pub port: u16,
     pub token: Arc<String>,
     pub capture_state: SharedCaptureState,
+    pub db: Option<Arc<Db>>,
 }
 
 pub fn start_server(config: ServerConfig) {
@@ -40,8 +61,9 @@ pub fn start_server(config: ServerConfig) {
                 Ok(stream) => {
                     let token = Arc::clone(&config.token);
                     let state = Arc::clone(&config.capture_state);
+                    let db_opt = config.db.as_ref().map(Arc::clone);
                     thread::spawn(move || {
-                        handle_client(stream, &token, &state);
+                        handle_client(stream, &token, &state, db_opt.as_ref());
                     });
                 }
                 Err(e) => {
@@ -52,7 +74,7 @@ pub fn start_server(config: ServerConfig) {
     });
 }
 
-fn handle_client(mut stream: TcpStream, token: &str, state: &SharedCaptureState) {
+fn handle_client(mut stream: TcpStream, token: &str, state: &SharedCaptureState, db: Option<&Arc<Db>>) {
     let mut buffer = [0u8; 8192];
     let bytes_read = match stream.read(&mut buffer) {
         Ok(n) if n > 0 => n,
@@ -142,6 +164,147 @@ fn handle_client(mut stream: TcpStream, token: &str, state: &SharedCaptureState)
         return;
     }
 
+    // Extract request body helper
+    let mut get_body = || {
+        let header_end = request_str
+            .find("\r\n\r\n")
+            .or_else(|| request_str.find("\n\n"));
+        if let Some(idx) = header_end {
+            let start = if request_str.contains("\r\n\r\n") {
+                idx + 4
+            } else {
+                idx + 2
+            };
+            let mut body_str = request_str[start..].to_string();
+            if content_length > body_str.len() && content_length <= 1024 * 1024 {
+                let remaining = content_length - body_str.len();
+                let mut extra_buf = vec![0u8; remaining];
+                if stream.read_exact(&mut extra_buf).is_ok() {
+                    body_str.push_str(&String::from_utf8_lossy(&extra_buf));
+                }
+            }
+            body_str
+        } else {
+            String::new()
+        }
+    };
+
+    // Recruiter email status update endpoint
+    if method == "POST" && path == "/api/status-update" {
+        if !verify_token(&auth_token, token) {
+            send_response(
+                &mut stream,
+                "401 Unauthorized",
+                "application/json",
+                r#"{"error":"unauthorized"}"#,
+                true,
+            );
+            return;
+        }
+
+        let body = get_body();
+        let payload_res: Result<StatusUpdatePayload, _> = serde_json::from_str(&body);
+
+        match payload_res {
+            Ok(payload) => {
+                let mut updated = false;
+                let mut matched_company = payload.company.clone();
+                let mut app_id = 0i64;
+
+                if let Some(db_arc) = db {
+                    if let Ok(guard) = db_arc.0.lock() {
+                        if let Some(conn) = guard.as_ref() {
+                            let comp_trim = payload.company.trim();
+                            let comp_search = format!("%{comp_trim}%");
+
+                            let found = conn
+                                .prepare(
+                                    "SELECT id, company, status, notes FROM applications
+                                     WHERE LOWER(company) LIKE LOWER(?1) OR LOWER(?2) LIKE '%' || LOWER(company) || '%'
+                                     ORDER BY created_at DESC LIMIT 1",
+                                )
+                                .and_then(|mut stmt| {
+                                    stmt.query_row(
+                                        rusqlite::params![comp_search, comp_trim],
+                                        |row| {
+                                            Ok((
+                                                row.get::<_, i64>(0)?,
+                                                row.get::<_, String>(1)?,
+                                                row.get::<_, String>(2)?,
+                                                row.get::<_, String>(3)?,
+                                            ))
+                                        },
+                                    )
+                                })
+                                .ok();
+
+                            if let Some((id, company_name, _prev_status, existing_notes)) = found {
+                                app_id = id;
+                                matched_company = company_name;
+                                let now = Local::now().to_rfc3339();
+                                let note_line = if let Some(snip) = &payload.snippet {
+                                    format!(
+                                        "\n[Gmail Sync: {} on {}] \"{}\"",
+                                        payload.status,
+                                        Local::now().format("%Y-%m-%d %H:%M"),
+                                        snip
+                                    )
+                                } else {
+                                    format!(
+                                        "\n[Gmail Sync: {} on {}]",
+                                        payload.status,
+                                        Local::now().format("%Y-%m-%d %H:%M")
+                                    )
+                                };
+                                let combined_notes = format!("{}{}", existing_notes, note_line);
+
+                                let _ = conn.execute(
+                                    "UPDATE applications SET status = ?1, notes = ?2 WHERE id = ?3",
+                                    rusqlite::params![payload.status, combined_notes.trim(), id],
+                                );
+
+                                let _ = conn.execute(
+                                    "INSERT INTO status_events (application_id, status, changed_at) VALUES (?1, ?2, ?3)",
+                                    rusqlite::params![id, payload.status, now],
+                                );
+
+                                updated = true;
+                            }
+                        }
+                    }
+                }
+
+                let resp = json!({
+                    "status": "ok",
+                    "updated": updated,
+                    "application_id": if updated { Some(app_id) } else { None },
+                    "matched_company": matched_company,
+                    "new_status": payload.status,
+                });
+
+                send_response(
+                    &mut stream,
+                    "200 OK",
+                    "application/json",
+                    &resp.to_string(),
+                    true,
+                );
+                return;
+            }
+            Err(e) => {
+                let resp = json!({ "error": format!("invalid_json: {e}") });
+                send_response(
+                    &mut stream,
+                    "400 Bad Request",
+                    "application/json",
+                    &resp.to_string(),
+                    true,
+                );
+                return;
+            }
+        }
+    }
+
     // Job capture endpoint
     if method == "POST" && path == "/api/capture" {
         if !verify_token(&auth_token, token) {
@@ -155,31 +318,7 @@ fn handle_client(mut stream: TcpStream, token: &str, state: &SharedCaptureState)
             return;
         }
 
-        // Extract body
-        let header_end = request_str
-            .find("\r\n\r\n")
-            .or_else(|| request_str.find("\n\n"));
-        let body = if let Some(idx) = header_end {
-            let start = if request_str.contains("\r\n\r\n") {
-                idx + 4
-            } else {
-                idx + 2
-            };
-            let mut body_str = request_str[start..].to_string();
-
-            // Read any remaining body bytes if content_length > buffer
-            if content_length > body_str.len() && content_length <= 1024 * 1024 {
-                let remaining = content_length - body_str.len();
-                let mut extra_buf = vec![0u8; remaining];
-                if stream.read_exact(&mut extra_buf).is_ok() {
-                    body_str.push_str(&String::from_utf8_lossy(&extra_buf));
-                }
-            }
-            body_str
-        } else {
-            String::new()
-        };
-
+        let body = get_body();
         let detected: Result<DetectedJob, _> = serde_json::from_str(&body);
         match detected {
             Ok(job) => {
@@ -234,7 +373,6 @@ fn handle_client(mut stream: TcpStream, token: &str, state: &SharedCaptureState)
 }
 
 fn verify_token(provided: &str, expected: &str) -> bool {
-    // Loopback-bound local server (127.0.0.1): Allow default connection out-of-the-box
     if expected.is_empty() || expected == "jt_default_local_token" {
         return true;
     }

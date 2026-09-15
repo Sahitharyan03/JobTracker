@@ -1,4 +1,5 @@
 import { extractJobFromDocument } from "./parsers";
+import { isGmailPage, scanGmailAndSync } from "./parsers/gmail";
 import { DetectedJob } from "./types";
 
 let lastSentUrl = "";
@@ -6,8 +7,21 @@ let lastJobJson = "";
 let debounceTimer: number | null = null;
 
 function scanAndNotify() {
-  const isIframe = window.top !== window.self;
   const currentUrl = window.location.href;
+
+  // 1. If on Gmail, check for recruiter emails
+  if (isGmailPage()) {
+    scanGmailAndSync((classification) => {
+      chrome.runtime.sendMessage({
+        type: "EMAIL_STATUS_DETECTED",
+        classification,
+      }).catch(() => {});
+    });
+    return;
+  }
+
+  // 2. Otherwise scan for job posting on careers pages
+  const isIframe = window.top !== window.self;
   const job = extractJobFromDocument(document, currentUrl);
 
   if (!job) {
@@ -50,7 +64,7 @@ if (document.readyState === "complete" || document.readyState === "interactive")
   window.addEventListener("DOMContentLoaded", () => debouncedScan(300));
 }
 
-// Watch for DOM mutations in single-page apps (SPAs)
+// Watch for DOM mutations in single-page apps (SPAs like Gmail, LinkedIn, Greenhouse)
 const observer = new MutationObserver((mutations) => {
   let hasMeaningfulChange = false;
   for (const m of mutations) {
@@ -60,7 +74,7 @@ const observer = new MutationObserver((mutations) => {
     }
   }
   if (hasMeaningfulChange) {
-    debouncedScan(1000);
+    debouncedScan(800);
   }
 });
 

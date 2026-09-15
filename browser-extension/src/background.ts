@@ -1,4 +1,5 @@
 import { CapturePayload, DetectedJob, ExtensionSettings } from "./types";
+import { EmailClassification } from "./parsers/emailClassifier";
 
 const DEFAULT_SETTINGS: ExtensionSettings = {
   token: "jt_default_local_token",
@@ -29,12 +30,10 @@ async function checkDesktopConnection(): Promise<boolean> {
     });
     if (res.ok) {
       const data = await res.json();
-      // Accepts "ok", "online", or online boolean for broad compatibility
       isConnected = data.status === "ok" || data.status === "online" || data.online === true;
       return isConnected;
     }
   } catch {
-    // Desktop app not running or port closed
     isConnected = false;
   }
   return isConnected;
@@ -84,6 +83,47 @@ async function sendJobToDesktop(job: DetectedJob): Promise<{ success: boolean; e
   }
 }
 
+async function sendStatusUpdateToDesktop(
+  classification: EmailClassification,
+): Promise<{ success: boolean; updated?: boolean; error?: string }> {
+  try {
+    const settings = await getSettings();
+    const token = settings.token || "jt_default_local_token";
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "Authorization": `Bearer ${token}`,
+      "X-JobTracker-Token": token,
+    };
+
+    const payload = {
+      company: classification.company,
+      status: classification.stage,
+      email_subject: classification.subject,
+      sender: classification.sender,
+      snippet: classification.snippet,
+      confidence: classification.confidence,
+      matched_at: new Date().toISOString(),
+    };
+
+    const res = await fetch(`${settings.serverUrl}/api/status-update`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return { success: true, updated: data.updated };
+    } else {
+      const txt = await res.text();
+      return { success: false, error: `HTTP ${res.status}: ${txt}` };
+    }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to reach desktop app" };
+  }
+}
+
 // Store per-tab detected jobs
 const tabJobs = new Map<number, DetectedJob>();
 
@@ -95,20 +135,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     tabJobs.set(tabId, job);
     latestDetectedJob = job;
 
-    // Save to storage for quick popup hydration
     chrome.storage.local.set({ latestDetectedJob: job });
 
-    // Send to desktop if autoCapture is enabled
     getSettings().then((settings) => {
       if (settings.autoCapture) {
         sendJobToDesktop(job);
       }
     });
 
-    // Update extension badge
     chrome.action.setBadgeText({ text: "✓", tabId });
     chrome.action.setBadgeBackgroundColor({ color: "#4F46E5", tabId });
     sendResponse({ received: true });
+  } else if (message.type === "EMAIL_STATUS_DETECTED") {
+    const classification: EmailClassification = message.classification;
+    sendStatusUpdateToDesktop(classification).then((result) => {
+      sendResponse(result);
+    });
+    return true; // async sendResponse
   } else if (message.type === "JOB_CLEARED" && sender.tab?.id) {
     const tabId = sender.tab.id;
     tabJobs.delete(tabId);
@@ -124,7 +167,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         });
       });
     });
-    return true; // async sendResponse
+    return true;
   } else if (message.type === "MANUAL_SEND_JOB") {
     if (message.job) {
       sendJobToDesktop(message.job).then((result) => {
@@ -171,7 +214,6 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   }
 });
 
-// Clean up closed tabs
 chrome.tabs.onRemoved.addListener((tabId) => {
   tabJobs.delete(tabId);
 });

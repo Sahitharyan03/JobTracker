@@ -7,12 +7,13 @@
 
 use rusqlite::Connection;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 /// Application-wide handle to the (optional) open database.
 ///
 /// `None` until the user completes first-run setup and picks a data folder.
-pub struct Db(pub Mutex<Option<Connection>>);
+#[derive(Clone)]
+pub struct Db(pub Arc<Mutex<Option<Connection>>>);
 
 pub const DB_FILE_NAME: &str = "jobtracker.db";
 

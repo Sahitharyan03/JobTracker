@@ -35,34 +35,44 @@ pub fn run() {
                     .ok()
             });
 
+            let db_instance = Db(Arc::new(Mutex::new(conn)));
+            let db_for_server = Arc::new(db_instance.clone());
+
             // Start loopback server for Chrome Extension integration
-            let token = if let Some(c) = &conn {
-                setting(c, "extension_token").unwrap_or_else(|| "jt_default_local_token".into())
-            } else {
-                "jt_default_local_token".into()
+            let token = {
+                let guard = db_instance.0.lock().unwrap();
+                if let Some(c) = guard.as_ref() {
+                    setting(c, "extension_token").unwrap_or_else(|| "jt_default_local_token".into())
+                } else {
+                    "jt_default_local_token".into()
+                }
             };
 
             server::start_server(server::ServerConfig {
                 port: server::DEFAULT_SERVER_PORT,
                 token: Arc::new(token),
                 capture_state: server_capture_state,
+                db: Some(db_for_server),
             });
 
             // Only register global shortcuts for a returning user (setup
             // already complete). A fresh install must not intercept any
             // key combo system-wide until the user has actually seen and
             // confirmed a hotkey in the setup wizard.
-            if let Some(c) = &conn {
-                let add = setting(c, "hotkey_add")
-                    .unwrap_or_else(|| hotkeys::DEFAULT_ADD_SHORTCUT.into());
-                let dash = setting(c, "hotkey_dashboard")
-                    .unwrap_or_else(|| hotkeys::DEFAULT_DASHBOARD_SHORTCUT.into());
-                if let Err(e) = hotkeys::register(app.handle(), &add, &dash) {
-                    eprintln!("{e}");
+            {
+                let guard = db_instance.0.lock().unwrap();
+                if let Some(c) = guard.as_ref() {
+                    let add = setting(c, "hotkey_add")
+                        .unwrap_or_else(|| hotkeys::DEFAULT_ADD_SHORTCUT.into());
+                    let dash = setting(c, "hotkey_dashboard")
+                        .unwrap_or_else(|| hotkeys::DEFAULT_DASHBOARD_SHORTCUT.into());
+                    if let Err(e) = hotkeys::register(app.handle(), &add, &dash) {
+                        eprintln!("{e}");
+                    }
                 }
             }
 
-            app.manage(Db(Mutex::new(conn)));
+            app.manage(db_instance);
             app.manage(capture_state);
 
             // Tray icon so the app stays reachable while backgrounded —

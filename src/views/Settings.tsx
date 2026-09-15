@@ -9,11 +9,13 @@ import { useEffect, useState } from "react";
 import { safeOpenDialog as openDialog, safeOpenPath as openPath } from "../lib/tauriBridge";
 import { api } from "../api";
 import HotkeyRecorder from "../components/HotkeyRecorder";
+import { classifyRecruiterEmail } from "../lib/emailClassifier";
 import type {
   DocKind,
   FieldDefinition,
   FieldType,
   ReusableValue,
+  Status,
 } from "../types";
 import "./Settings.css";
 
@@ -87,6 +89,14 @@ export default function Settings() {
   const [extensionToken, setExtensionToken] = useState("");
   const [tokenCopied, setTokenCopied] = useState(false);
   const [extensionDir, setExtensionDir] = useState("");
+
+  // Gmail & Recruiter Email Auto-Sync Simulator State
+  const [simSender, setSimSender] = useState("recruiting@stripe.com");
+  const [simSubject, setSimSubject] = useState("Next steps with Stripe - Technical Interview");
+  const [simBody, setSimBody] = useState(
+    "Hi Sahit,\n\nThank you for taking the time to speak with our team. We were very impressed with your background and would like to invite you for a 45-minute technical interview with one of our software engineers.\n\nPlease select a time slot using our scheduler.\n\nBest,\nThe Stripe Recruiting Team"
+  );
+  const [syncingEmail, setSyncingEmail] = useState(false);
 
   const loadReusable = () => {
     api.listReusableValues("address").then((addrs) => {
@@ -790,7 +800,203 @@ export default function Settings() {
           </div>
         </section>
 
-        {/* CARD 6: DEMO & SAMPLE DATA */}
+        {/* CARD 6: GMAIL & RECRUITER EMAIL AUTO-SYNC */}
+        <section className="settings-card">
+          <div className="settings-card-header">
+            <div>
+              <div className="settings-card-title">
+                Gmail &amp; Recruiter Email Auto-Sync
+                <span className="metric-badge success">Live Engine Active</span>
+              </div>
+              <div className="settings-card-subtitle">
+                Passively parses recruiter updates when reading emails in Gmail (mail.google.com), accurately detecting interview invites, OAs, offers, and rejections to rearrange your application board.
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {/* Presets Row */}
+            <div>
+              <div style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-faint)", marginBottom: "0.5rem" }}>
+                Test Sample Email Templates
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                <button
+                  type="button"
+                  className="settings-btn"
+                  style={{ fontSize: "0.6875rem", padding: "0.3rem 0.625rem" }}
+                  onClick={() => {
+                    setSimSender("recruiting@stripe.com");
+                    setSimSubject("Next steps with Stripe - Technical Interview");
+                    setSimBody(
+                      "Hi Sahit,\n\nThank you for speaking with our team! We were very impressed with your experience and would like to invite you for a 45-minute technical interview with our software engineering team.\n\nPlease choose a convenient time slot using our scheduler: https://calendly.com/stripe-recruiting/45min\n\nBest,\nThe Stripe Recruiting Team"
+                    );
+                  }}
+                >
+                  🟢 Stripe: Interview Invitation
+                </button>
+                <button
+                  type="button"
+                  className="settings-btn"
+                  style={{ fontSize: "0.6875rem", padding: "0.3rem 0.625rem" }}
+                  onClick={() => {
+                    setSimSender("careers@google.com");
+                    setSimSubject("Offer of Employment: Software Engineer at Google");
+                    setSimBody(
+                      "Dear Sahit,\n\nCongratulations! We are pleased to offer you the position of Software Engineer at Google. Your formal offer letter, compensation package, and benefits details are ready for review in your candidate portal.\n\nWelcome to the team!\nGoogle Talent Acquisition"
+                    );
+                  }}
+                >
+                  🟡 Google: Formal Job Offer
+                </button>
+                <button
+                  type="button"
+                  className="settings-btn"
+                  style={{ fontSize: "0.6875rem", padding: "0.3rem 0.625rem" }}
+                  onClick={() => {
+                    setSimSender("no-reply@amazon.jobs");
+                    setSimSubject("Amazon Software Development Engineer Assessment Invitation");
+                    setSimBody(
+                      "Hello Sahit,\n\nThank you for applying to Amazon. The next step in our interview process is an online assessment (coding challenge) via HackerRank.\n\nPlease complete the assessment within 5 business days of receiving this email.\n\nAmazon Student Programs"
+                    );
+                  }}
+                >
+                  🔵 Amazon: Online Assessment (OA)
+                </button>
+                <button
+                  type="button"
+                  className="settings-btn"
+                  style={{ fontSize: "0.6875rem", padding: "0.3rem 0.625rem" }}
+                  onClick={() => {
+                    setSimSender("talent@uber.com");
+                    setSimSubject("Update on your application with Uber");
+                    setSimBody(
+                      "Hi Sahit,\n\nThank you for your interest in Uber and for taking the time to apply. After careful review, we have decided to pursue other candidates whose qualifications more closely align with our current hiring needs.\n\nWe wish you all the best in your job search.\nUber Recruiting"
+                    );
+                  }}
+                >
+                  🔴 Uber: Decision Notice
+                </button>
+              </div>
+            </div>
+
+            {/* Email Input Fields */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: "0.6875rem", fontWeight: 700, color: "var(--text-secondary)" }}>Sender Email / Name</label>
+                <input
+                  className="settings-input"
+                  style={{ width: "100%" }}
+                  value={simSender}
+                  onChange={(e) => setSimSender(e.target.value)}
+                  placeholder="e.g. recruiting@stripe.com"
+                />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: "0.6875rem", fontWeight: 700, color: "var(--text-secondary)" }}>Subject Line</label>
+                <input
+                  className="settings-input"
+                  style={{ width: "100%" }}
+                  value={simSubject}
+                  onChange={(e) => setSimSubject(e.target.value)}
+                  placeholder="e.g. Invitation to Interview"
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <label style={{ fontSize: "0.6875rem", fontWeight: 700, color: "var(--text-secondary)" }}>Email Body</label>
+              <textarea
+                className="settings-input"
+                style={{ width: "100%", minHeight: "5.5rem", fontFamily: "inherit", resize: "vertical" }}
+                value={simBody}
+                onChange={(e) => setSimBody(e.target.value)}
+                placeholder="Paste recruiter email text here to test entity recognition..."
+              />
+            </div>
+
+            {/* Real-time Classification Results */}
+            {(() => {
+              const res = classifyRecruiterEmail(simSubject, "", simSender, simBody);
+              if (!res) {
+                return (
+                  <div style={{ padding: "0.875rem", background: "var(--bg-inset)", borderRadius: "0.5rem", fontSize: "0.75rem", color: "var(--text-faint)", textAlign: "center" }}>
+                    No recruiter decision or status pattern detected in this text. Try one of the presets above.
+                  </div>
+                );
+              }
+
+              const badgeMap: Record<string, { label: string; color: string; bg: string }> = {
+                offer: { label: "OFFER RECEIVED", color: "var(--success)", bg: "var(--success-soft)" },
+                interview: { label: "INTERVIEW STAGE", color: "var(--warning)", bg: "var(--warning-soft)" },
+                screening: { label: "SCREENING / OA", color: "#3b82f6", bg: "rgba(59, 130, 246, 0.15)" },
+                rejected: { label: "NOT MOVING FORWARD", color: "var(--danger)", bg: "var(--danger-soft)" },
+                applied: { label: "APPLICATION CONFIRMED", color: "var(--accent)", bg: "var(--accent-soft)" },
+              };
+              const b = badgeMap[res.stage] || { label: res.stage.toUpperCase(), color: "var(--text)", bg: "var(--bg-inset)" };
+
+              return (
+                <div style={{ padding: "1rem", background: "var(--bg-inset)", border: "1px solid var(--border)", borderRadius: "0.625rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontSize: "1.125rem", fontWeight: 900, color: "var(--text)" }}>{res.company}</span>
+                      <span style={{ background: b.bg, color: b.color, fontSize: "0.6875rem", fontWeight: 800, padding: "0.2rem 0.625rem", borderRadius: "9999px", letterSpacing: "0.04em" }}>
+                        {b.label}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)", fontWeight: 600 }}>
+                      Match Confidence: <strong style={{ color: "var(--accent)" }}>{(res.confidence * 100).toFixed(0)}%</strong>
+                    </span>
+                  </div>
+
+                  {res.snippet && (
+                    <div style={{ fontSize: "0.75rem", color: "var(--text)", background: "var(--bg-card)", padding: "0.5rem 0.75rem", borderRadius: "0.375rem", borderLeft: `3px solid ${b.color}`, fontStyle: "italic" }}>
+                      "{res.snippet}"
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "0.25rem", flexWrap: "wrap", gap: 8 }}>
+                    <span style={{ fontSize: "0.6875rem", color: "var(--text-faint)" }}>
+                      Extension will automatically show this confirmation banner inside Gmail.
+                    </span>
+                    <button
+                      className="settings-btn primary"
+                      type="button"
+                      disabled={syncingEmail}
+                      onClick={async () => {
+                        setSyncingEmail(true);
+                        try {
+                          const result = await api.syncEmailStatus({
+                            company: res.company,
+                            status: res.stage as Status,
+                            snippet: res.snippet,
+                            email_subject: res.subject,
+                            sender: res.sender,
+                            confidence: res.confidence,
+                          });
+                          if (result.updated) {
+                            flash(`✓ Successfully updated ${result.matched_company || res.company} to ${res.stage.toUpperCase()} on your Kanban board!`);
+                          } else {
+                            flash(`No existing application matched "${res.company}". Try seeding sample data or adding an entry for ${res.company}.`);
+                          }
+                        } catch (e) {
+                          flash(`Sync error: ${e}`);
+                        } finally {
+                          setSyncingEmail(false);
+                        }
+                      }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>bolt</span>
+                      {syncingEmail ? "Updating Board..." : `Test & Move ${res.company} on Board`}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </section>
+
+        {/* CARD 7: DEMO & SAMPLE DATA */}
         <section className="settings-card">
           <div className="settings-card-header">
             <div>

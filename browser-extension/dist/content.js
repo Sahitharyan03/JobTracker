@@ -617,13 +617,405 @@
     return null;
   }
 
+  // browser-extension/src/parsers/emailClassifier.ts
+  var GENERIC_EMAIL_DOMAINS = /* @__PURE__ */ new Set([
+    "gmail.com",
+    "googlemail.com",
+    "yahoo.com",
+    "outlook.com",
+    "hotmail.com",
+    "live.com",
+    "icloud.com",
+    "me.com",
+    "proton.me",
+    "protonmail.com",
+    "aol.com",
+    "zoho.com",
+    "mail.com"
+  ]);
+  var ATS_DOMAINS = [
+    "greenhouse.io",
+    "greenhouse-mail.io",
+    "gh.io",
+    "lever.co",
+    "hire.lever.co",
+    "ashbyhq.com",
+    "jobs.ashbyhq.com",
+    "myworkday.com",
+    "myworkdayjobs.com",
+    "smartrecruiters.com",
+    "bamboohr.com",
+    "icims.com",
+    "taleo.net",
+    "jobvite.com",
+    "recruitee.com",
+    "workable.com",
+    "workablemail.com",
+    "rippling.com",
+    "pinpointhq.com",
+    "applytojob.com",
+    "jazzhr.com",
+    "interviewing.io",
+    "codesignal.com",
+    "hackerrank.com",
+    "codility.com",
+    "hirevue.com"
+  ];
+  var RULES = [
+    // ── 1. OFFER RULES ──────────────────────────────────────
+    { pattern: /\b(?:pleased|delighted|thrilled|excited)\s+to\s+offer\s+you\b/i, weight: 1, stage: "offer" },
+    { pattern: /\b(?:formal|official|written)\s+(?:job\s+)?offer\b/i, weight: 0.95, stage: "offer" },
+    { pattern: /\boffer\s+of\s+employment\b/i, weight: 0.95, stage: "offer" },
+    { pattern: /\bcongratulations\s+on\s+your\s+offer\b/i, weight: 0.95, stage: "offer" },
+    { pattern: /\boffer\s+letter\s+(?:attached|enclosed|ready)\b/i, weight: 0.9, stage: "offer" },
+    { pattern: /\bwelcome\s+to\s+the\s+team\b/i, weight: 0.85, stage: "offer" },
+    { pattern: /\bcompensation\s+(?:package|details|and\s+benefits)\b/i, weight: 0.75, stage: "offer" },
+    { pattern: /\b(?:cannot|unable\s+to|not\s+able\s+to)\s+(?:make|extend|offer)\b/i, weight: 1, stage: "rejected", isNegative: true },
+    // ── 2. REJECTION RULES ──────────────────────────────────
+    { pattern: /\b(?:decided\s+to\s+)?pursue\s+(?:other|more\s+experienced|other\s+qualified)\s+candidates\b/i, weight: 0.98, stage: "rejected" },
+    { pattern: /\bmoving\s+forward\s+with\s+(?:other|other\s+candidates|another\s+candidate)\b/i, weight: 0.98, stage: "rejected" },
+    { pattern: /\bnot\s+moving\s+forward\s+with\s+your\s+(?:application|candidacy)\b/i, weight: 0.98, stage: "rejected" },
+    { pattern: /\bdecided\s+not\s+to\s+(?:move\s+forward|proceed)\b/i, weight: 0.98, stage: "rejected" },
+    { pattern: /\bwill\s+not\s+be\s+moving\s+forward\b/i, weight: 0.98, stage: "rejected" },
+    { pattern: /\bunfortunately[,\s]+(?:we|after|at\s+this\s+time)\b/i, weight: 0.9, stage: "rejected" },
+    { pattern: /\bnot\s+selected\s+for\s+(?:an\s+interview|this\s+position|the\s+role)\b/i, weight: 0.95, stage: "rejected" },
+    { pattern: /\bafter\s+careful\s+(?:consideration|review)[,\s]+(?:we|at\s+this\s+time)\b/i, weight: 0.92, stage: "rejected" },
+    { pattern: /\bhigh\s+volume\s+of\s+(?:qualified\s+)?applicants\b/i, weight: 0.85, stage: "rejected" },
+    { pattern: /\bwish\s+you\s+(?:the\s+best|all\s+the\s+best|success)\s+in\s+your\s+job\s+search\b/i, weight: 0.9, stage: "rejected" },
+    { pattern: /\bkeep\s+your\s+(?:resume|application|details)\s+on\s+file\b/i, weight: 0.85, stage: "rejected" },
+    { pattern: /\bposition\s+has\s+been\s+filled\b/i, weight: 0.9, stage: "rejected" },
+    // ── 3. INTERVIEW RULES ──────────────────────────────────
+    { pattern: /\b(?:invitation|invite)\s+to\s+interview\b/i, weight: 0.98, stage: "interview" },
+    { pattern: /\b(?:like|love)\s+to\s+(?:schedule|invite\s+you\s+for)\s+(?:an?\s+)?(?:interview|call|conversation|chat)\b/i, weight: 0.95, stage: "interview" },
+    { pattern: /\b(?:technical|phone|screening|video|onsite|virtual\s+onsite|panel)\s+interview\b/i, weight: 0.95, stage: "interview" },
+    { pattern: /\bnext\s+round\s+of\s+interviews\b/i, weight: 0.95, stage: "interview" },
+    { pattern: /\bchat\s+with\s+(?:our|the)\s+hiring\s+manager\b/i, weight: 0.9, stage: "interview" },
+    { pattern: /\bselect\s+a\s+time\s+(?:slot|that\s+works|using\s+this\s+link)\b/i, weight: 0.88, stage: "interview" },
+    { pattern: /\bcalendly\.com\/|\bhire\.lever\.co\/interviews|\bgrehouse\.io\/interviews\b/i, weight: 0.88, stage: "interview" },
+    { pattern: /\bavailability\s+for\s+a\s+(?:15|30|45|60)[\s-]*minute\b/i, weight: 0.92, stage: "interview" },
+    { pattern: /\binterview\s+confirmation\b/i, weight: 0.95, stage: "interview" },
+    // ── 4. SCREENING / ASSESSMENT RULES ─────────────────────
+    { pattern: /\b(?:online|technical|coding|take-home)\s+assessment\b/i, weight: 0.95, stage: "screening" },
+    { pattern: /\bcoding\s+challenge\b/i, weight: 0.95, stage: "screening" },
+    { pattern: /\b(?:hackerrank|codesignal|codility|hirevue|karat|byteboard)\b/i, weight: 0.95, stage: "screening" },
+    { pattern: /\bcomplete\s+the\s+(?:assessment|test|challenge)\s+within\b/i, weight: 0.9, stage: "screening" },
+    { pattern: /\binitial\s+screening\b/i, weight: 0.85, stage: "screening" },
+    // ── 5. APPLIED RULES ────────────────────────────────────
+    { pattern: /\bthank\s+you\s+for\s+applying\b/i, weight: 0.9, stage: "applied" },
+    { pattern: /\bwe(?:'ve|\s+have)\s+received\s+your\s+application\b/i, weight: 0.9, stage: "applied" },
+    { pattern: /\bapplication\s+submitted\s+successfully\b/i, weight: 0.95, stage: "applied" },
+    { pattern: /\bconfirming\s+receipt\s+of\s+your\s+application\b/i, weight: 0.9, stage: "applied" },
+    { pattern: /\byour\s+application\s+to\s+[A-Za-z0-9\s&.,'-]+\s+has\s+been\s+received\b/i, weight: 0.95, stage: "applied" }
+  ];
+  function sanitizeCompanyName(raw) {
+    if (!raw) return "";
+    let name = raw.trim();
+    name = name.replace(/^(?:at|with|from|for|the)\s+/i, "");
+    name = name.replace(/\s+(?:careers|recruiting|talent|team|jobs|hiring|ltd|llc|inc|corp|corporation|technologies|solutions|group|portal|platform)$/i, "");
+    name = name.replace(/[.,\-_!]+$/, "").trim();
+    if (name.length > 0 && name === name.toLowerCase()) {
+      name = name.split(" ").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    }
+    return name;
+  }
+  function extractCompany(senderName, senderEmail, subject, body) {
+    const subjectPatterns = [
+      /your\s+application\s+to\s+(?:the\s+)?([A-Za-z0-9\s&.,'-]+?)(?:\s+(?:for|role|team|-|–|—|!|$))/i,
+      /thank\s+you\s+for\s+applying\s+to\s+(?:the\s+)?([A-Za-z0-9\s&.,'-]+?)(?:\s+(?:for|role|team|-|–|—|!|$))/i,
+      /(?:interview|update|next\s+steps|invitation)\s+(?:with|at|from)\s+([A-Za-z0-9\s&.,'-]+?)(?:\s+(?:for|role|team|-|–|—|!|$))/i,
+      /^([A-Za-z0-9\s&.,'-]+?)\s*:\s*(?:Your\s+application|Interview|Update|Offer|Next\s+steps)/i,
+      /(?:welcome\s+to|joining)\s+([A-Za-z0-9\s&.,'-]+?)(?:\s+(?:team|family|!|$))/i
+    ];
+    for (const pat of subjectPatterns) {
+      const match = subject.match(pat);
+      if (match && match[1]) {
+        const candidate = sanitizeCompanyName(match[1]);
+        if (candidate.length >= 2 && candidate.length <= 40) {
+          return candidate;
+        }
+      }
+    }
+    if (senderName) {
+      const cleanSender = senderName.replace(/<.*?>/g, "").replace(/["]+/g, "").trim();
+      const isAtsName = ATS_DOMAINS.some((ats) => cleanSender.toLowerCase().includes(ats.split(".")[0]));
+      if (!isAtsName && !cleanSender.toLowerCase().includes("no-reply") && !cleanSender.toLowerCase().includes("notifications")) {
+        const candidate = sanitizeCompanyName(cleanSender);
+        if (candidate.length >= 2 && candidate.length <= 35) {
+          return candidate;
+        }
+      }
+    }
+    if (senderEmail && senderEmail.includes("@")) {
+      const domain = senderEmail.split("@")[1]?.toLowerCase()?.trim() ?? "";
+      const isGeneric = GENERIC_EMAIL_DOMAINS.has(domain);
+      const isAts = ATS_DOMAINS.some((ats) => domain.includes(ats));
+      if (!isGeneric && !isAts && domain.includes(".")) {
+        const parts = domain.split(".");
+        const mainPart = parts.length > 2 && parts[0] === "jobs" ? parts[1] : parts[0];
+        if (mainPart && mainPart.length >= 2) {
+          return sanitizeCompanyName(mainPart);
+        }
+      }
+    }
+    const bodyPatterns = [
+      /thank\s+you\s+for\s+your\s+interest\s+in\s+(?:a\s+career\s+at\s+|the\s+[^.]+\s+at\s+)?([A-Za-z0-9\s&.,'-]+?)(?:\.|\n|<)/i,
+      /thank\s+you\s+for\s+applying\s+to\s+([A-Za-z0-9\s&.,'-]+?)(?:\.|\n|<)/i,
+      /the\s+([A-Za-z0-9\s&.,'-]+?)\s+(?:recruiting|talent|hiring)\s+team/i
+    ];
+    for (const pat of bodyPatterns) {
+      const match = body.match(pat);
+      if (match && match[1]) {
+        const candidate = sanitizeCompanyName(match[1]);
+        if (candidate.length >= 2 && candidate.length <= 40) {
+          return candidate;
+        }
+      }
+    }
+    return "";
+  }
+  function findSentenceSnippet(text, matchIndex, matchLength) {
+    if (matchIndex < 0) return "";
+    const start = Math.max(0, text.lastIndexOf(".", matchIndex) + 1);
+    let end = text.indexOf(".", matchIndex + matchLength);
+    if (end === -1) end = Math.min(text.length, matchIndex + matchLength + 60);
+    else end = end + 1;
+    const snippet = text.slice(start, end).replace(/\s+/g, " ").trim();
+    return snippet.length > 180 ? snippet.slice(0, 177) + "..." : snippet;
+  }
+  function classifyRecruiterEmail(subject, senderName, senderEmail, body) {
+    const fullText = `${subject}
+
+${body}`;
+    const company = extractCompany(senderName, senderEmail, subject, body);
+    let bestMatch = null;
+    for (const rule of RULES) {
+      const match = fullText.match(rule.pattern);
+      if (match && match.index !== void 0) {
+        const snippet = findSentenceSnippet(fullText, match.index, match[0].length);
+        if (rule.isNegative) {
+          return {
+            company: company || "Unknown Company",
+            stage: "rejected",
+            confidence: rule.weight,
+            snippet: snippet || match[0],
+            subject,
+            sender: senderName || senderEmail,
+            sender_email: senderEmail,
+            raw_body: body.slice(0, 1e3)
+          };
+        }
+        if (!bestMatch || rule.weight > bestMatch.confidence) {
+          bestMatch = {
+            stage: rule.stage,
+            confidence: rule.weight,
+            snippet: snippet || match[0]
+          };
+        }
+      }
+    }
+    if (!bestMatch) {
+      return null;
+    }
+    return {
+      company: company || "Detected Company",
+      stage: bestMatch.stage,
+      confidence: bestMatch.confidence,
+      snippet: bestMatch.snippet,
+      subject,
+      sender: senderName || senderEmail,
+      sender_email: senderEmail,
+      raw_body: body.slice(0, 1e3)
+    };
+  }
+
+  // browser-extension/src/parsers/gmail.ts
+  var lastScannedEmailId = "";
+  var currentBanner = null;
+  function isGmailPage() {
+    return window.location.hostname.includes("mail.google.com");
+  }
+  function extractGmailEmailData() {
+    const subjectEl = document.querySelector("h2.hP") || document.querySelector("div[role='main'] h2") || document.querySelector("div.ha h2");
+    const subject = subjectEl?.innerText?.trim() || "";
+    const senderEl = document.querySelector("span.gD") || document.querySelector("span[email]");
+    const senderName = senderEl?.getAttribute("name") || senderEl?.innerText?.trim() || "";
+    const senderEmail = senderEl?.getAttribute("email") || "";
+    const bodyEls = Array.from(
+      document.querySelectorAll("div.a3s.aiL, div.a3s, div[dir='ltr']")
+    );
+    const activeBodyEl = bodyEls[bodyEls.length - 1];
+    const body = activeBodyEl?.innerText?.trim() || "";
+    if (!subject && !body) {
+      return null;
+    }
+    const emailId = `${subject}__${senderEmail}__${body.slice(0, 100)}`;
+    return { subject, senderName, senderEmail, body, emailId };
+  }
+  function scanGmailAndSync(onStatusDetected) {
+    if (!isGmailPage()) return;
+    const data = extractGmailEmailData();
+    if (!data) {
+      removeBanner();
+      return;
+    }
+    if (data.emailId === lastScannedEmailId) {
+      return;
+    }
+    lastScannedEmailId = data.emailId;
+    const classification = classifyRecruiterEmail(
+      data.subject,
+      data.senderName,
+      data.senderEmail,
+      data.body
+    );
+    if (classification) {
+      renderGmailBanner(classification, (confirmed) => {
+        onStatusDetected(confirmed);
+      });
+    } else {
+      removeBanner();
+    }
+  }
+  function removeBanner() {
+    if (currentBanner && currentBanner.parentNode) {
+      currentBanner.parentNode.removeChild(currentBanner);
+      currentBanner = null;
+    }
+  }
+  function getStageBadgeStyle(stage) {
+    switch (stage) {
+      case "offer":
+        return { bg: "rgba(16, 185, 129, 0.15)", color: "#10b981", label: "Offer Received", icon: "verified" };
+      case "interview":
+        return { bg: "rgba(217, 119, 6, 0.15)", color: "#f59e0b", label: "Interview Stage", icon: "event" };
+      case "screening":
+        return { bg: "rgba(59, 130, 246, 0.15)", color: "#3b82f6", label: "Assessment / Screening", icon: "code" };
+      case "rejected":
+        return { bg: "rgba(239, 68, 68, 0.15)", color: "#ef4444", label: "Not Moving Forward", icon: "cancel" };
+      case "applied":
+        return { bg: "rgba(99, 102, 241, 0.15)", color: "#6366f1", label: "Application Acknowledged", icon: "mark_email_read" };
+      default:
+        return { bg: "rgba(107, 114, 128, 0.15)", color: "#9ca3af", label: "Update Detected", icon: "info" };
+    }
+  }
+  function renderGmailBanner(classification, onConfirm) {
+    removeBanner();
+    const badge = getStageBadgeStyle(classification.stage);
+    const banner = document.createElement("div");
+    banner.id = "jobtracker-gmail-banner";
+    banner.style.cssText = `
+    position: fixed;
+    top: 72px;
+    right: 24px;
+    z-index: 999999;
+    max-width: 380px;
+    background: #18181b;
+    color: #f4f4f5;
+    border: 1px solid #3f3f46;
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.45);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    animation: jtSlideDown 250ms ease-out;
+  `;
+    banner.innerHTML = `
+    <style>
+      @keyframes jtSlideDown {
+        from { opacity: 0; transform: translateY(-12px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .jt-btn-primary {
+        background: #4f46e5;
+        color: #ffffff;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 150ms;
+      }
+      .jt-btn-primary:hover {
+        background: #4338ca;
+      }
+      .jt-btn-close {
+        background: transparent;
+        border: none;
+        color: #a1a1aa;
+        cursor: pointer;
+        font-size: 16px;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+      .jt-btn-close:hover {
+        color: #ffffff;
+        background: #27272a;
+      }
+    </style>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="font-size: 14px;">\u{1F3AF}</span>
+        <span style="font-size: 11px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #a1a1aa;">JobTracker Sync</span>
+      </div>
+      <button class="jt-btn-close" id="jt-dismiss-btn" title="Dismiss">\u2715</button>
+    </div>
+
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px;">
+      <div style="font-size: 14px; font-weight: 800; color: #ffffff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+        ${classification.company}
+      </div>
+      <div style="background: ${badge.bg}; color: ${badge.color}; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 9999px; white-space: nowrap;">
+        ${badge.label}
+      </div>
+    </div>
+
+    ${classification.snippet ? `
+      <div style="font-size: 11px; color: #d4d4d8; line-height: 1.4; background: #27272a; border-radius: 6px; padding: 8px; margin-bottom: 10px; border-left: 3px solid ${badge.color}; font-style: italic;">
+        "${classification.snippet}"
+      </div>
+    ` : ""}
+
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 4px;">
+      <span style="font-size: 10px; color: #71717a; font-weight: 600;">
+        Match confidence: ${(classification.confidence * 100).toFixed(0)}%
+      </span>
+      <button class="jt-btn-primary" id="jt-apply-btn">
+        Move to ${classification.stage.charAt(0).toUpperCase() + classification.stage.slice(1)} \u2192
+      </button>
+    </div>
+  `;
+    document.body.appendChild(banner);
+    currentBanner = banner;
+    const applyBtn = banner.querySelector("#jt-apply-btn");
+    const dismissBtn = banner.querySelector("#jt-dismiss-btn");
+    applyBtn?.addEventListener("click", () => {
+      applyBtn.innerText = "\u2713 Updated!";
+      applyBtn.style.background = "#10b981";
+      setTimeout(() => removeBanner(), 1200);
+      onConfirm(classification);
+    });
+    dismissBtn?.addEventListener("click", () => {
+      removeBanner();
+    });
+  }
+
   // browser-extension/src/content.ts
   var lastSentUrl = "";
   var lastJobJson = "";
   var debounceTimer = null;
   function scanAndNotify() {
-    const isIframe = window.top !== window.self;
     const currentUrl = window.location.href;
+    if (isGmailPage()) {
+      scanGmailAndSync((classification) => {
+        chrome.runtime.sendMessage({
+          type: "EMAIL_STATUS_DETECTED",
+          classification
+        }).catch(() => {
+        });
+      });
+      return;
+    }
+    const isIframe = window.top !== window.self;
     const job = extractJobFromDocument(document, currentUrl);
     if (!job) {
       if (!isIframe) {
@@ -669,7 +1061,7 @@
       }
     }
     if (hasMeaningfulChange) {
-      debouncedScan(1e3);
+      debouncedScan(800);
     }
   });
   observer.observe(document.body || document.documentElement, {

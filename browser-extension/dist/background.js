@@ -73,6 +73,41 @@ async function sendJobToDesktop(job) {
     return { success: false, error: err.message || "Failed to reach desktop app" };
   }
 }
+async function sendStatusUpdateToDesktop(classification) {
+  try {
+    const settings = await getSettings();
+    const token = settings.token || "jt_default_local_token";
+    const headers = {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "Authorization": `Bearer ${token}`,
+      "X-JobTracker-Token": token
+    };
+    const payload = {
+      company: classification.company,
+      status: classification.stage,
+      email_subject: classification.subject,
+      sender: classification.sender,
+      snippet: classification.snippet,
+      confidence: classification.confidence,
+      matched_at: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    const res = await fetch(`${settings.serverUrl}/api/status-update`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return { success: true, updated: data.updated };
+    } else {
+      const txt = await res.text();
+      return { success: false, error: `HTTP ${res.status}: ${txt}` };
+    }
+  } catch (err) {
+    return { success: false, error: err.message || "Failed to reach desktop app" };
+  }
+}
 var tabJobs = /* @__PURE__ */ new Map();
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "JOB_DETECTED" && sender.tab?.id) {
@@ -89,6 +124,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     chrome.action.setBadgeText({ text: "\u2713", tabId });
     chrome.action.setBadgeBackgroundColor({ color: "#4F46E5", tabId });
     sendResponse({ received: true });
+  } else if (message.type === "EMAIL_STATUS_DETECTED") {
+    const classification = message.classification;
+    sendStatusUpdateToDesktop(classification).then((result) => {
+      sendResponse(result);
+    });
+    return true;
   } else if (message.type === "JOB_CLEARED" && sender.tab?.id) {
     const tabId = sender.tab.id;
     tabJobs.delete(tabId);
