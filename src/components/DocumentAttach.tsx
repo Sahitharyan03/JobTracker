@@ -4,7 +4,7 @@
  */
 
 import { useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
+import { safeOpenDialog as open } from "../lib/tauriBridge";
 import type { DocValue } from "../lib/form";
 import type { DocKind } from "../types";
 import "./DocumentAttach.css";

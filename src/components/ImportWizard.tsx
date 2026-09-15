@@ -7,7 +7,7 @@
  */
 
 import { useMemo, useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
+import { safeOpenDialog as open } from "../lib/tauriBridge";
 import { api } from "../api";
 import {
   buildImportRow,

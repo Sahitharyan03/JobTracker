@@ -6,8 +6,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { safeOpenDialog as openDialog, safeOpenPath as openPath } from "../lib/tauriBridge";
 import { api } from "../api";
 import HotkeyRecorder from "../components/HotkeyRecorder";
 import type {
@@ -788,6 +787,47 @@ export default function Settings() {
                 </button>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* CARD 6: DEMO & SAMPLE DATA */}
+        <section className="settings-card">
+          <div className="settings-card-header">
+            <div>
+              <div className="settings-card-title">
+                Sample Data &amp; Demo Sandbox
+                <span className="metric-badge active">Interactive</span>
+              </div>
+              <div className="settings-card-subtitle">
+                Populate realistic job applications, interview pipelines, salary data, and presets matching Stitch mockups.
+              </div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}>
+            <button
+              className="settings-btn accent-soft"
+              type="button"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600 }}
+              onClick={async () => {
+                await api.seedSampleData();
+                flash("Sample applications and presets loaded successfully!");
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>auto_awesome</span>
+              Load 14+ Realistic Applications &amp; Presets
+            </button>
+            <button
+              className="settings-btn"
+              type="button"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+              onClick={async () => {
+                await api.resetSampleData();
+                flash("Demo dataset reset to initial state.");
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>refresh</span>
+              Reset to Defaults
+            </button>
           </div>
         </section>
       </div>

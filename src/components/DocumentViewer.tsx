@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { save } from "@tauri-apps/plugin-dialog";
+import { safeSaveDialog as save } from "../lib/tauriBridge";
 import { api } from "../api";
 import type { Application } from "../types";
 import "./DocumentViewer.css";

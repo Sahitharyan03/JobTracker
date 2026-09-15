@@ -6,7 +6,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { safeOpenDialog as openDialog } from "../lib/tauriBridge";
 import { api } from "../api";
 import {
   emptyValues,
