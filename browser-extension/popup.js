@@ -87,13 +87,8 @@
     showToast("Scanning page...", "success");
     const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!activeTab?.id) return;
-    chrome.tabs.sendMessage(activeTab.id, { type: "SCAN_CURRENT_PAGE" }, (response) => {
-      if (chrome.runtime.lastError || !response) {
-        renderJob(null);
-        showToast("Could not scan page (please refresh tab)", "error");
-        return;
-      }
-      if (response.emailClassification) {
+    const handleResponse = (response) => {
+      if (response?.emailClassification) {
         const { company, stage, confidence } = response.emailClassification;
         showToast(`\u2709\uFE0F ${company}: ${stage.toUpperCase()} (${(confidence * 100).toFixed(0)}%)`, "success");
         chrome.runtime.sendMessage({
@@ -102,7 +97,7 @@
         });
         return;
       }
-      if (response.job) {
+      if (response?.job) {
         renderJob(response.job);
         showToast("Job details detected!", "success");
         chrome.runtime.sendMessage({ type: "JOB_DETECTED", job: response.job });
@@ -110,6 +105,27 @@
         renderJob(null);
         showToast("No job posting or recruiter email found", "error");
       }
+    };
+    chrome.tabs.sendMessage(activeTab.id, { type: "SCAN_CURRENT_PAGE" }, async (response) => {
+      if (chrome.runtime.lastError || !response) {
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: activeTab.id },
+            files: ["content.js"]
+          });
+          setTimeout(() => {
+            chrome.tabs.sendMessage(activeTab.id, { type: "SCAN_CURRENT_PAGE" }, (res2) => {
+              if (res2) handleResponse(res2);
+              else showToast("Please refresh tab once to activate", "error");
+            });
+          }, 300);
+        } catch {
+          renderJob(null);
+          showToast("Could not scan page (please refresh tab)", "error");
+        }
+        return;
+      }
+      handleResponse(response);
     });
   }
   sendBtn.addEventListener("click", () => {
@@ -178,11 +194,27 @@
     showToast("Scanning mailbox on Gmail...", "success");
     const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!activeTab?.id) return;
-    chrome.tabs.sendMessage(activeTab.id, { type: "TRIGGER_GMAIL_INBOX_SCAN" }, (res) => {
-      if (res?.success) {
-        showToast("Inbox scanner modal opened on Gmail!", "success");
+    chrome.tabs.sendMessage(activeTab.id, { type: "TRIGGER_GMAIL_INBOX_SCAN" }, async (res) => {
+      if (chrome.runtime.lastError || !res?.success) {
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: activeTab.id },
+            files: ["content.js"]
+          });
+          setTimeout(() => {
+            chrome.tabs.sendMessage(activeTab.id, { type: "TRIGGER_GMAIL_INBOX_SCAN" }, (res2) => {
+              if (res2?.success) {
+                showToast("Inbox scanner modal opened on Gmail!", "success");
+              } else {
+                showToast("Scanner active! Click the floating button at bottom-right of Gmail.", "success");
+              }
+            });
+          }, 300);
+        } catch {
+          showToast("Please refresh your Gmail tab once to activate extension.", "error");
+        }
       } else {
-        showToast("Please refresh your Gmail tab and try again", "error");
+        showToast("Inbox scanner modal opened on Gmail!", "success");
       }
     });
   });

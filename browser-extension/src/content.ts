@@ -1,5 +1,11 @@
 import { extractJobFromDocument } from "./parsers";
-import { extractGmailEmailData, isGmailPage, scanGmailAndSync } from "./parsers/gmail";
+import {
+  extractGmailEmailData,
+  isGmailPage,
+  scanGmailAndSync,
+  triggerFullInboxScanAndModal,
+  ensureFloatingControlMounted,
+} from "./parsers/gmail";
 import { classifyRecruiterEmail } from "./parsers/emailClassifier";
 import { DetectedJob } from "./types";
 
@@ -15,6 +21,7 @@ function scanAndNotify() {
   // 1. If on Gmail, check for recruiter emails
   if (isGmailPage()) {
     if (window.top === window.self) {
+      ensureFloatingControlMounted();
       scanGmailAndSync((classification) => {
         chrome.runtime.sendMessage({
           type: "EMAIL_STATUS_DETECTED",
@@ -109,7 +116,9 @@ window.addEventListener("hashchange", () => debouncedScan(300));
 
 // If on Gmail, run a gentle periodic poll every 1.8 seconds in the top frame to catch SPA transitions
 if (isGmailPage() && window.top === window.self) {
+  ensureFloatingControlMounted();
   setInterval(() => {
+    ensureFloatingControlMounted();
     scanGmailAndSync((classification) => {
       chrome.runtime.sendMessage({
         type: "EMAIL_STATUS_DETECTED",
@@ -123,10 +132,8 @@ if (isGmailPage() && window.top === window.self) {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "TRIGGER_GMAIL_INBOX_SCAN") {
     if (isGmailPage()) {
-      import("./parsers/gmail").then(({ triggerFullInboxScanAndModal }) => {
-        triggerFullInboxScanAndModal();
-        sendResponse({ success: true });
-      });
+      triggerFullInboxScanAndModal();
+      sendResponse({ success: true });
       return true;
     } else {
       sendResponse({ success: false, error: "Not on Gmail page" });
@@ -156,5 +163,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 });
+
 
 
