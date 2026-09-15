@@ -23,7 +23,9 @@ pub fn show_dashboard(app: &AppHandle) {
 
 pub fn show_popup(app: &AppHandle) {
     if let Some(win) = app.get_webview_window("popup") {
+        let _ = win.unminimize();
         let _ = win.show();
+        let _ = win.set_always_on_top(true);
         let _ = win.set_focus();
         return;
     }
@@ -35,8 +37,14 @@ pub fn show_popup(app: &AppHandle) {
             .decorations(false)
             .always_on_top(true)
             .center()
+            .focused(true)
             .build();
-    if let Err(e) = result {
+    if let Ok(win) = result {
+        let _ = win.unminimize();
+        let _ = win.show();
+        let _ = win.set_always_on_top(true);
+        let _ = win.set_focus();
+    } else if let Err(e) = result {
         eprintln!("failed to create popup window: {e}");
     }
 }

@@ -26,8 +26,21 @@ interface DetectionNotice {
   message: string;
 }
 
+const STANDARD_PORTALS = [
+  "LinkedIn",
+  "Greenhouse",
+  "Lever",
+  "Workday",
+  "Indeed",
+  "Ashby",
+  "jobrightai",
+  "Company Website",
+  "Internal Referral",
+];
+
 export default function Popup() {
   const [values, setValues] = useState<FormValues>(emptyValues());
+  const [customPortalMode, setCustomPortalMode] = useState(false);
   const [resumeFormat, setResumeFormat] = useState<"tex" | "pdf">("tex");
   const [coverFormat, setCoverFormat] = useState<"tex" | "pdf">("tex");
   const [resumeTex, setResumeTex] = useState("");
@@ -60,19 +73,18 @@ export default function Popup() {
     api.listReusableValues("phone").then(setSavedPhones).catch(() => {});
   }, []);
 
-  // Check for detected job from Chrome extension on open
-  useEffect(() => {
+  const syncLatestJob = useCallback(() => {
     api
       .getLatestJobCapture()
       .then((summary) => {
         if (summary && summary.job) {
           const { job, is_stale, fields_count } = summary;
           if (is_stale) {
-            setDetectionNotice({
-              type: "none",
-              message: "⚠️ Job details not detected",
-            });
             return;
+          }
+
+          if (job.portal && !STANDARD_PORTALS.includes(job.portal)) {
+            setCustomPortalMode(true);
           }
 
           setValues((prev) => ({
@@ -91,26 +103,39 @@ export default function Popup() {
             },
           }));
 
-          if (fields_count >= 4 && job.role && job.company) {
+          if (fields_count >= 3 && job.role && job.company) {
             setDetectionNotice({
               type: "full",
-              message: `✅ Done filling! Job details captured${job.portal ? ` from ${job.portal}` : ""}`,
+              message: `✅ Done filling! Auto-filled from ${job.portal || "active job posting"}`,
             });
           } else if (fields_count > 0) {
             setDetectionNotice({
               type: "partial",
-              message: `✅ Job detected · ${fields_count} fields filled`,
-            });
-          } else {
-            setDetectionNotice({
-              type: "none",
-              message: "⚠️ Job details not detected",
+              message: `✅ Job detected · ${fields_count} fields auto-filled`,
             });
           }
         }
       })
       .catch(() => {});
   }, []);
+
+  // Check for detected job on open and poll briefly
+  useEffect(() => {
+    syncLatestJob();
+
+    // Check on window focus
+    window.addEventListener("focus", syncLatestJob);
+
+    // Poll a few times after opening to catch in-flight extension payload
+    const interval = setInterval(syncLatestJob, 800);
+    const stopTimer = setTimeout(() => clearInterval(interval), 4500);
+
+    return () => {
+      window.removeEventListener("focus", syncLatestJob);
+      clearInterval(interval);
+      clearTimeout(stopTimer);
+    };
+  }, [syncLatestJob]);
 
   // Duplicate detection debounced check
   useEffect(() => {
@@ -387,23 +412,62 @@ export default function Popup() {
                 <label htmlFor="application-portal">
                   Portal
                 </label>
-                <select
-                  id="application-portal"
-                  style={{ width: "100%" }}
-                  value={values.builtin.portal || ""}
-                  onChange={(e) => updateBuiltin("portal", e.target.value)}
-                >
-                  <option value="">— Select source portal —</option>
-                  <option value="LinkedIn">LinkedIn</option>
-                  <option value="Greenhouse">Greenhouse</option>
-                  <option value="Lever">Lever</option>
-                  <option value="Workday">Workday</option>
-                  <option value="Indeed">Indeed</option>
-                  <option value="jobrightai">Jobright AI</option>
-                  <option value="Company Website">Company Career Portal</option>
-                  <option value="Internal Referral">Internal Referral</option>
-                  <option value="Other">Other</option>
-                </select>
+                {customPortalMode ? (
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <input
+                      id="application-portal"
+                      style={{ width: "100%" }}
+                      placeholder="Type custom portal (e.g. Wellfound, Otta...)"
+                      type="text"
+                      autoFocus
+                      value={values.builtin.portal === "Other" ? "" : (values.builtin.portal || "")}
+                      onChange={(e) => updateBuiltin("portal", e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      style={{
+                        padding: "0.45rem 0.65rem",
+                        fontSize: "0.75rem",
+                        fontWeight: 600,
+                        background: "var(--bg-inset)",
+                        border: "1px solid var(--border)",
+                        borderRadius: "0.375rem",
+                        color: "var(--text-secondary)",
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                      onClick={() => {
+                        setCustomPortalMode(false);
+                        updateBuiltin("portal", "LinkedIn");
+                      }}
+                      title="Back to portal dropdown list"
+                    >
+                      List
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    id="application-portal"
+                    style={{ width: "100%" }}
+                    value={STANDARD_PORTALS.includes(values.builtin.portal || "") ? values.builtin.portal : (values.builtin.portal ? "__OTHER__" : "")}
+                    onChange={(e) => {
+                      if (e.target.value === "__OTHER__" || e.target.value === "Other") {
+                        setCustomPortalMode(true);
+                        updateBuiltin("portal", "");
+                      } else {
+                        updateBuiltin("portal", e.target.value);
+                      }
+                    }}
+                  >
+                    <option value="">— Select source portal —</option>
+                    {STANDARD_PORTALS.map((p) => (
+                      <option key={p} value={p}>
+                        {p === "jobrightai" ? "Jobright AI" : p}
+                      </option>
+                    ))}
+                    <option value="__OTHER__">Other (Type custom name)…</option>
+                  </select>
+                )}
               </div>
             </div>
 
