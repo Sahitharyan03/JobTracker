@@ -17,6 +17,7 @@ import {
   forecast,
 } from "../lib/analytics";
 import type { Application } from "../types";
+import GeoMap from "../components/insights/GeoMap";
 import "./Insights.css";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -43,7 +44,6 @@ function funnelColor(stage: string): string {
 
 export default function Insights() {
   const [apps, setApps] = useState<Application[]>([]);
-  const [geoFilter, setGeoFilter] = useState<"all" | "remote" | "onsite">("all");
   const [viewMonth, setViewMonth] = useState(() => {
     const d = new Date();
     return { year: d.getFullYear(), month: d.getMonth() };
@@ -125,29 +125,6 @@ export default function Insights() {
     return bars;
   }, [counts]);
   const weekMax = useMemo(() => Math.max(1, ...weeklyBars.map((b) => b.count)), [weeklyBars]);
-
-  // ── Geo breakdown ─────────────────────────────────────────────────────────────
-  const geoData = useMemo(() => {
-    const filtered =
-      geoFilter === "all"
-        ? apps
-        : apps.filter((a) => {
-            const isRemote =
-              a.work_type === "Remote" ||
-              (a.location?.toLowerCase().includes("remote") ?? false);
-            return geoFilter === "remote" ? isRemote : !isRemote;
-          });
-
-    const locMap = new Map<string, number>();
-    for (const a of filtered) {
-      if (!a.location) continue;
-      const key = a.location.split(",")[0].trim();
-      locMap.set(key, (locMap.get(key) ?? 0) + 1);
-    }
-    return Array.from(locMap.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8);
-  }, [apps, geoFilter]);
 
   // ── Streak dots (last 7 days) ──────────────────────────────────────────────────
   const streakDots = useMemo(() => {
@@ -459,61 +436,13 @@ export default function Insights() {
             ))}
           </div>
 
-          {/* TILE C: Geographic Footprint ────────────────────────────── */}
-          <div className="bento-tile span-5">
-            <div className="tile-header">
-              <div>
-                <div className="tile-title">
-                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: "var(--info)" }}>map</span>
-                  Geographic Footprint
-                </div>
-                <div className="tile-sub">
-                  {apps.filter((a) => a.work_type === "Remote" || a.location?.toLowerCase().includes("remote")).length} remote ·{" "}
-                  {apps.length - apps.filter((a) => a.work_type === "Remote" || a.location?.toLowerCase().includes("remote")).length} on-site
-                </div>
-              </div>
-              <div className="geo-filter-group">
-                {(["all", "remote", "onsite"] as const).map((f) => (
-                  <button
-                    key={f}
-                    className={`geo-filter-pill${geoFilter === f ? " active" : ""}`}
-                    type="button"
-                    onClick={() => setGeoFilter(f)}
-                  >
-                    {f.charAt(0).toUpperCase() + f.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {geoData.length > 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {geoData.map(([city, count], i) => {
-                  const pct = totalVolume > 0 ? (count / totalVolume) * 100 : 0;
-                  return (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: "7rem", fontSize: "0.75rem", color: "var(--text)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {city}
-                      </div>
-                      <div className="funnel-track" style={{ flex: 1 }}>
-                        <div className="funnel-fill" style={{ width: `${pct}%`, background: "var(--info)" }} />
-                      </div>
-                      <div style={{ fontSize: "0.6875rem", color: "var(--text-secondary)", fontWeight: 700, width: "2rem", textAlign: "right" }}>
-                        {count}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-faint)", fontSize: "0.75rem" }}>
-                {apps.length === 0 ? "Add applications to see geographic data" : "No location data available"}
-              </div>
-            )}
+          {/* TILE C: Geographic Footprint (Interactive USA & Global Map) ────────────── */}
+          <div className="bento-tile span-12">
+            <GeoMap apps={apps} />
           </div>
 
           {/* TILE D: Portal Effectiveness ───────────────────────────── */}
-          <div className="bento-tile span-7">
+          <div className="bento-tile span-6">
             <div className="tile-header">
               <div>
                 <div className="tile-title">
@@ -645,7 +574,7 @@ export default function Insights() {
           </div>
 
           {/* TILE F: Application Schedule & Timing ──────────────────── */}
-          <div className="bento-tile span-6">
+          <div className="bento-tile span-12">
             <div className="tile-header">
               <div>
                 <div className="tile-title">
