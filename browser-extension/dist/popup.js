@@ -88,13 +88,27 @@
     const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!activeTab?.id) return;
     chrome.tabs.sendMessage(activeTab.id, { type: "SCAN_CURRENT_PAGE" }, (response) => {
-      if (chrome.runtime.lastError || !response || !response.job) {
+      if (chrome.runtime.lastError || !response) {
         renderJob(null);
-        showToast("No job found on this page", "error");
-      } else {
+        showToast("Could not scan page (please refresh tab)", "error");
+        return;
+      }
+      if (response.emailClassification) {
+        const { company, stage, confidence } = response.emailClassification;
+        showToast(`\u2709\uFE0F ${company}: ${stage.toUpperCase()} (${(confidence * 100).toFixed(0)}%)`, "success");
+        chrome.runtime.sendMessage({
+          type: "EMAIL_STATUS_DETECTED",
+          classification: response.emailClassification
+        });
+        return;
+      }
+      if (response.job) {
         renderJob(response.job);
         showToast("Job details detected!", "success");
         chrome.runtime.sendMessage({ type: "JOB_DETECTED", job: response.job });
+      } else {
+        renderJob(null);
+        showToast("No job posting or recruiter email found", "error");
       }
     });
   }

@@ -11,6 +11,7 @@
   "host_permissions": [
     "http://127.0.0.1:41724/*",
     "http://localhost:41724/*",
+    "https://mail.google.com/*",
     "<all_urls>"
   ],
   "background": {
@@ -19,7 +20,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": ["<all_urls>", "https://mail.google.com/*"],
       "js": ["content.js"],
       "run_at": "document_idle",
       "all_frames": true

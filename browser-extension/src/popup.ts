@@ -100,14 +100,29 @@ async function rescanActiveTab() {
   if (!activeTab?.id) return;
 
   chrome.tabs.sendMessage(activeTab.id, { type: "SCAN_CURRENT_PAGE" }, (response) => {
-    if (chrome.runtime.lastError || !response || !response.job) {
+    if (chrome.runtime.lastError || !response) {
       renderJob(null);
-      showToast("No job found on this page", "error");
-    } else {
+      showToast("Could not scan page (please refresh tab)", "error");
+      return;
+    }
+
+    if (response.emailClassification) {
+      const { company, stage, confidence } = response.emailClassification;
+      showToast(`✉️ ${company}: ${stage.toUpperCase()} (${(confidence * 100).toFixed(0)}%)`, "success");
+      chrome.runtime.sendMessage({
+        type: "EMAIL_STATUS_DETECTED",
+        classification: response.emailClassification,
+      });
+      return;
+    }
+
+    if (response.job) {
       renderJob(response.job);
       showToast("Job details detected!", "success");
-      // also notify background
       chrome.runtime.sendMessage({ type: "JOB_DETECTED", job: response.job });
+    } else {
+      renderJob(null);
+      showToast("No job posting or recruiter email found", "error");
     }
   });
 }
