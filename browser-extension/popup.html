@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JobTracker Capture Companion</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo-group">
+        <div class="logo-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+          </svg>
+        </div>
+        <div class="title-group">
+          <span class="brand-title">JobTracker</span>
+          <span class="brand-sub">Companion</span>
+        </div>
+      </div>
+      <div id="connectionPill" class="status-pill status-disconnected">
+        <span class="status-dot"></span>
+        <span id="connectionText">Checking...</span>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="content">
+      <!-- Detected Job Card -->
+      <section id="jobCard" class="card job-card hidden">
+        <div class="job-card-header">
+          <div class="card-badge" id="sourceBadge">JSON-LD</div>
+          <div class="card-badge badge-portal" id="portalBadge">LinkedIn</div>
+        </div>
+        <div class="job-titles">
+          <h2 class="job-role" id="jobRole">Role Title</h2>
+          <div class="job-company" id="jobCompany">Company Name</div>
+        </div>
+
+        <div class="job-meta-grid">
+          <div class="meta-item">
+            <span class="meta-label">Work Type</span>
+            <span class="meta-value badge-work-type" id="jobWorkType">Remote</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Location</span>
+            <span class="meta-value" id="jobLocation">San Francisco, CA</span>
+          </div>
+          <div class="meta-item" id="salaryWrapper">
+            <span class="meta-label">Salary</span>
+            <span class="meta-value" id="jobSalary">$130k - $160k</span>
+          </div>
+          <div class="meta-item" id="jobIdWrapper">
+            <span class="meta-label">Job ID</span>
+            <span class="meta-value" id="jobId">#394829</span>
+          </div>
+        </div>
+
+        <div class="action-buttons">
+          <button id="sendBtn" class="btn btn-primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Send to JobTracker
+          </button>
+          <button id="rescanBtn" class="btn btn-secondary">Rescan</button>
+        </div>
+      </section>
+
+      <!-- Empty State -->
+      <section id="emptyCard" class="card empty-card">
+        <div class="empty-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </div>
+        <h3 class="empty-title">No job detected</h3>
+        <p class="empty-desc">Navigate to a job posting on LinkedIn, Indeed, Greenhouse, Lever, Ashby, or Workday.</p>
+        <button id="emptyRescanBtn" class="btn btn-secondary">Scan This Page</button>
+      </section>
+
+      <!-- Toast Feedback -->
+      <div id="toast" class="toast hidden"></div>
+
+      <!-- Settings Section -->
+      <section class="settings-section">
+        <button id="toggleSettingsBtn" class="settings-toggle" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          Settings & Pairing
+        </button>
+
+        <div id="settingsPanel" class="settings-panel hidden">
+          <div class="form-group">
+            <label for="tokenInput">Desktop Security Token</label>
+            <input type="password" id="tokenInput" placeholder="Paste token from Settings" autocomplete="off" />
+            <span class="field-hint">Copy from JobTracker App -> Settings -> Extension Token</span>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="autoCaptureCheck" checked />
+              <span>Auto-capture when viewing job posts</span>
+            </label>
+          </div>
+
+          <div class="settings-actions">
+            <button id="saveSettingsBtn" class="btn btn-primary btn-sm">Save & Connect</button>
+            <button id="testConnectionBtn" class="btn btn-secondary btn-sm">Test Connection</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>JobTracker v2.0 Local Sync</span>
+      <span>127.0.0.1:41724</span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
