@@ -161,5 +161,31 @@
       }
     });
   });
+  var gmailCard = document.getElementById("gmailCard");
+  var gmailScanBtn = document.getElementById("gmailScanBtn");
+  async function checkActiveTabForGmail() {
+    try {
+      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (activeTab?.url && activeTab.url.includes("mail.google.com")) {
+        gmailCard?.classList.remove("hidden");
+      } else {
+        gmailCard?.classList.add("hidden");
+      }
+    } catch {
+    }
+  }
+  gmailScanBtn?.addEventListener("click", async () => {
+    showToast("Scanning mailbox on Gmail...", "success");
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!activeTab?.id) return;
+    chrome.tabs.sendMessage(activeTab.id, { type: "TRIGGER_GMAIL_INBOX_SCAN" }, (res) => {
+      if (res?.success) {
+        showToast("Inbox scanner modal opened on Gmail!", "success");
+      } else {
+        showToast("Please refresh your Gmail tab and try again", "error");
+      }
+    });
+  });
   loadStatus();
+  checkActiveTabForGmail();
 })();

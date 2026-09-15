@@ -121,6 +121,19 @@ if (isGmailPage() && window.top === window.self) {
 
 // Listen for explicit rescan requests from popup
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === "TRIGGER_GMAIL_INBOX_SCAN") {
+    if (isGmailPage()) {
+      import("./parsers/gmail").then(({ triggerFullInboxScanAndModal }) => {
+        triggerFullInboxScanAndModal();
+        sendResponse({ success: true });
+      });
+      return true;
+    } else {
+      sendResponse({ success: false, error: "Not on Gmail page" });
+      return true;
+    }
+  }
+
   if (message.type === "SCAN_CURRENT_PAGE") {
     if (isGmailPage()) {
       const emailData = extractGmailEmailData();
@@ -143,4 +156,5 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 });
+
 

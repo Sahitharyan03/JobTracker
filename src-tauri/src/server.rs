@@ -21,6 +21,8 @@ pub struct StatusUpdatePayload {
     pub company: String,
     pub status: String,
     #[serde(default)]
+    pub role: Option<String>,
+    #[serde(default)]
     pub notes: Option<String>,
     #[serde(default)]
     pub email_subject: Option<String>,
@@ -32,6 +34,11 @@ pub struct StatusUpdatePayload {
     pub confidence: Option<f64>,
     #[serde(default)]
     pub matched_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BatchStatusUpdatePayload {
+    pub updates: Vec<StatusUpdatePayload>,
 }
 
 pub struct ServerConfig {
@@ -188,6 +195,201 @@ fn handle_client(mut stream: TcpStream, token: &str, state: &SharedCaptureState,
             String::new()
         }
     };
+
+    // Applications list endpoint for extension auto-matching
+    if method == "GET" && path == "/api/applications" {
+        if !verify_token(&auth_token, token) {
+            send_response(
+                &mut stream,
+                "401 Unauthorized",
+                "application/json",
+                r#"{"error":"unauthorized"}"#,
+                true,
+            );
+            return;
+        }
+
+        let mut apps = Vec::new();
+        if let Some(db_arc) = db {
+            if let Ok(guard) = db_arc.0.lock() {
+                if let Some(conn) = guard.as_ref() {
+                    if let Ok(mut stmt) = conn.prepare(
+                        "SELECT id, company, role, status, work_type, location, created_at FROM applications ORDER BY created_at DESC"
+                    ) {
+                        let rows = stmt.query_map([], |row| {
+                            Ok(json!({
+                                "id": row.get::<_, i64>(0)?,
+                                "company": row.get::<_, String>(1)?,
+                                "role": row.get::<_, String>(2)?,
+                                "status": row.get::<_, String>(3)?,
+                                "work_type": row.get::<_, String>(4)?,
+                                "location": row.get::<_, String>(5)?,
+                                "created_at": row.get::<_, String>(6)?,
+                            }))
+                        });
+                        if let Ok(mapped) = rows {
+                            for r in mapped.flatten() {
+                                apps.push(r);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let resp = json!({ "status": "ok", "applications": apps });
+        send_response(
+            &mut stream,
+            "200 OK",
+            "application/json",
+            &resp.to_string(),
+            true,
+        );
+        return;
+    }
+
+    // Batch Recruiter email status update endpoint
+    if method == "POST" && path == "/api/batch-status-update" {
+        if !verify_token(&auth_token, token) {
+            send_response(
+                &mut stream,
+                "401 Unauthorized",
+                "application/json",
+                r#"{"error":"unauthorized"}"#,
+                true,
+            );
+            return;
+        }
+
+        let body = get_body();
+        let payload_res: Result<BatchStatusUpdatePayload, _> = serde_json::from_str(&body);
+
+        match payload_res {
+            Ok(batch) => {
+                let mut updated_results = Vec::new();
+
+                if let Some(db_arc) = db {
+                    if let Ok(guard) = db_arc.0.lock() {
+                        if let Some(conn) = guard.as_ref() {
+                            for item in &batch.updates {
+                                let comp_trim = item.company.trim();
+                                let comp_search = format!("%{comp_trim}%");
+
+                                // Match by company and optionally role
+                                let found = if let Some(role_filter) = &item.role {
+                                    let role_search = format!("%{}%", role_filter.trim());
+                                    conn.prepare(
+                                        "SELECT id, company, role, status, notes FROM applications
+                                         WHERE (LOWER(company) LIKE LOWER(?1) OR LOWER(?2) LIKE '%' || LOWER(company) || '%')
+                                           AND (LOWER(role) LIKE LOWER(?3) OR LOWER(?3) LIKE '%' || LOWER(role) || '%')
+                                         ORDER BY created_at DESC LIMIT 1"
+                                    ).and_then(|mut stmt| {
+                                        stmt.query_row(
+                                            rusqlite::params![comp_search, comp_trim, role_search],
+                                            |row| Ok((
+                                                row.get::<_, i64>(0)?,
+                                                row.get::<_, String>(1)?,
+                                                row.get::<_, String>(2)?,
+                                                row.get::<_, String>(3)?,
+                                                row.get::<_, String>(4)?,
+                                            ))
+                                        )
+                                    }).ok()
+                                } else {
+                                    None
+                                };
+
+                                let found = found.or_else(|| {
+                                    conn.prepare(
+                                        "SELECT id, company, role, status, notes FROM applications
+                                         WHERE LOWER(company) LIKE LOWER(?1) OR LOWER(?2) LIKE '%' || LOWER(company) || '%'
+                                         ORDER BY created_at DESC LIMIT 1"
+                                    ).and_then(|mut stmt| {
+                                        stmt.query_row(
+                                            rusqlite::params![comp_search, comp_trim],
+                                            |row| Ok((
+                                                row.get::<_, i64>(0)?,
+                                                row.get::<_, String>(1)?,
+                                                row.get::<_, String>(2)?,
+                                                row.get::<_, String>(3)?,
+                                                row.get::<_, String>(4)?,
+                                            ))
+                                        )
+                                    }).ok()
+                                });
+
+                                if let Some((id, company_name, role_name, prev_status, existing_notes)) = found {
+                                    let now = Local::now().to_rfc3339();
+                                    let note_line = if let Some(snip) = &item.snippet {
+                                        format!(
+                                            "\n[Gmail Auto-Scan: {} on {}] \"{}\"",
+                                            item.status,
+                                            Local::now().format("%Y-%m-%d %H:%M"),
+                                            snip
+                                        )
+                                    } else {
+                                        format!(
+                                            "\n[Gmail Auto-Scan: {} on {}]",
+                                            item.status,
+                                            Local::now().format("%Y-%m-%d %H:%M")
+                                        )
+                                    };
+                                    let combined_notes = format!("{}{}", existing_notes, note_line);
+
+                                    let _ = conn.execute(
+                                        "UPDATE applications SET status = ?1, notes = ?2 WHERE id = ?3",
+                                        rusqlite::params![item.status, combined_notes.trim(), id],
+                                    );
+
+                                    let _ = conn.execute(
+                                        "INSERT INTO status_events (application_id, status, changed_at) VALUES (?1, ?2, ?3)",
+                                        rusqlite::params![id, item.status, now],
+                                    );
+
+                                    updated_results.push(json!({
+                                        "id": id,
+                                        "company": company_name,
+                                        "role": role_name,
+                                        "previous_status": prev_status,
+                                        "new_status": item.status,
+                                        "snippet": item.snippet,
+                                        "confidence": item.confidence,
+                                    }));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                let count = updated_results.len();
+                let resp = json!({
+                    "status": "ok",
+                    "updated_count": count,
+                    "updated_applications": updated_results,
+                });
+
+                send_response(
+                    &mut stream,
+                    "200 OK",
+                    "application/json",
+                    &resp.to_string(),
+                    true,
+                );
+                return;
+            }
+            Err(e) => {
+                let resp = json!({ "error": format!("invalid_json: {e}") });
+                send_response(
+                    &mut stream,
+                    "400 Bad Request",
+                    "application/json",
+                    &resp.to_string(),
+                    true,
+                );
+                return;
+            }
+        }
+    }
 
     // Recruiter email status update endpoint
     if method == "POST" && path == "/api/status-update" {

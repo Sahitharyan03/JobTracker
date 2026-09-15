@@ -175,6 +175,57 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
       return true;
     }
+  } else if (message.type === "GET_TRACKED_APPLICATIONS") {
+    getSettings().then(async (settings) => {
+      try {
+        const token = settings.token || "jt_default_local_token";
+        const headers: Record<string, string> = {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+          "X-JobTracker-Token": token,
+        };
+        const res = await fetch(`${settings.serverUrl}/api/applications`, {
+          method: "GET",
+          headers,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          sendResponse({ success: true, applications: data.applications || [] });
+        } else {
+          sendResponse({ success: false, applications: [] });
+        }
+      } catch {
+        sendResponse({ success: false, applications: [] });
+      }
+    });
+    return true;
+  } else if (message.type === "BATCH_STATUS_UPDATE") {
+    getSettings().then(async (settings) => {
+      try {
+        const token = settings.token || "jt_default_local_token";
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+          "X-JobTracker-Token": token,
+        };
+        const res = await fetch(`${settings.serverUrl}/api/batch-status-update`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ updates: message.updates }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          sendResponse({ success: true, ...data });
+        } else {
+          const txt = await res.text();
+          sendResponse({ success: false, error: txt });
+        }
+      } catch (err: any) {
+        sendResponse({ success: false, error: err.message });
+      }
+    });
+    return true;
   } else if (message.type === "TEST_CONNECTION") {
     getSettings().then(async (settings) => {
       try {
