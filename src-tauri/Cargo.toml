@@ -1,6 +1,6 @@
 [package]
 name = "job-tracker"
-version = "0.1.1"
+version = "0.2.0"
 description = "A privacy-first local job application tracker"
 authors = ["MJKR"]
 edition = "2021"
